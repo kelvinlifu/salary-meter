@@ -177,6 +177,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 .shifts { display: flex; flex-direction: column; gap: 10px; }
 .shift { display: grid; grid-template-columns: 1.2fr repeat(4, 1fr); gap: 8px; align-items: end; }
 .shift label { display: flex; flex-direction: column; gap: 2px; font-size: .72rem; color: var(--muted); min-width: 0; }
+.shift input { font: inherit; font-family: var(--font-num); font-size: .92rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; width: 100%; min-width: 0; }
+.shift input[type="text"] { font-family: var(--font-body); }
 @media (max-width: 560px) {
   .shift { grid-template-columns: 1fr 1fr; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
   .shift label:first-child { grid-column: 1 / -1; }
@@ -229,6 +231,19 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 .log .amt { font-family: var(--font-num); font-weight: 600; color: var(--ot); font-variant-numeric: tabular-nums; }
 .log .empty { color: var(--muted); font-size: .9rem; }
 .logform { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* Leave and the month ledger */
+.chip[data-s="leave"] { color: var(--meter-dim); }
+.bar .leavez { position: absolute; top: 0; bottom: 0; background: var(--muted); opacity: .35; }
+.dash { align-self: center; color: var(--muted); }
+.ledger { margin: 0; display: flex; flex-direction: column; }
+.ledger div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 0; }
+.ledger dt { color: var(--muted); font-size: .9rem; min-width: 0; }
+.ledger dd { margin: 0; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ledger dd.o, .log .amt .o { color: var(--ot); }
+.ledger .total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; }
+.ledger .total dt { color: var(--ink); font-weight: 700; }
+.ledger .total dd { font-weight: 600; font-size: 1.2rem; }
+.log .amt { display: flex; flex-direction: column; align-items: flex-end; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -271,7 +286,18 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <div class="ask-btns"><button type="button" class="punch-btn ot" id="askOt">還在加班</button><button type="button" class="ghost-btn" id="askLeft">我已經下班了</button></div>
       <p class="hint">沒回答就不算加班。按「還在加班」會從表定下班時間開始算。</p>
     </div>
-    <p class="month">本月底薪已累積 <b id="monthBase">NT$0</b>　加班／值班另外賺 <b class="o" id="monthExtra">NT$0</b></p>
+  </section>
+
+  <section class="card">
+    <h2>本月薪水</h2>
+    <dl class="ledger">
+      <div><dt>月薪（按日子累積）</dt><dd id="mBase">NT$0</dd></div>
+      <div><dt>加班／值班</dt><dd class="o" id="mExtra">+NT$0</dd></div>
+      <div><dt>請假扣薪</dt><dd id="mLeave">−NT$0</dd></div>
+      <div><dt>勞保＋健保自付（按日子累積）</dt><dd id="mIns">−NT$0</dd></div>
+      <div class="total"><dt>目前實領累積</dt><dd id="mNet">NT$0</dd></div>
+    </dl>
+    <p class="hint" id="mNote"></p>
   </section>
 
   <section class="card">
@@ -281,13 +307,16 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <label>班別<select id="shiftSel"></select></label>
       <label>實際下班時間（按「我下班了」會自動填）<span class="inline"><input type="time" id="punchTime"><button type="button" id="punchClear">取消</button></span></label>
       <label class="full" id="dutyWrap" hidden>這班的值班津貼（NT$）<input type="number" id="dutyPay" min="0" step="100" inputmode="numeric"></label>
+      <label id="leaveWrap">請假<select id="leaveKind"></select></label>
+      <label id="leaveTimeWrap" hidden>請假時段<span class="inline"><input type="time" id="leaveFrom"><span class="dash">–</span><input type="time" id="leaveTo"></span></label>
+      <p class="hint full" id="leaveNote" hidden></p>
     </div>
     <p class="rule" id="rule"></p>
     <p class="hint">過了表定下班時間會先問你還在不在加班。按了「還在加班」卻忘了按下班，最多算到表定下班後 4 小時。換日後會自動回到「平日上班」。</p>
   </section>
 
   <section class="card">
-    <div class="log-head"><h2>本月加班紀錄</h2><button type="button" class="linkbtn" id="logAdd">＋ 補登一天</button></div>
+    <div class="log-head"><h2>本月加班與請假紀錄</h2><button type="button" class="linkbtn" id="logAdd">＋ 補登一天</button></div>
     <ul class="log" id="logList"></ul>
     <form class="logform" id="logForm" hidden>
       <div class="form">
@@ -296,6 +325,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
         <label>班別<select id="lfShift"></select></label>
         <label>實際下班時間<input type="time" id="lfPunch" required></label>
         <label class="full" id="lfDutyWrap" hidden>值班津貼（NT$）<input type="number" id="lfDuty" min="0" step="100" inputmode="numeric"></label>
+        <label id="lfLeaveWrap">請假<select id="lfLeave"></select></label>
+        <label id="lfLeaveTimeWrap" hidden>請假時段<span class="inline"><input type="time" id="lfLeaveFrom"><span class="dash">–</span><input type="time" id="lfLeaveTo"></span></label>
       </div>
       <p class="rule" id="lfPreview"></p>
       <div class="lf-btns"><button type="submit" class="punch-btn">儲存</button><button type="button" class="ghost-btn" id="lfCancel">取消</button><button type="button" class="ghost-btn danger" id="lfDelete" hidden>刪除這筆</button></div>
@@ -316,6 +347,15 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <p class="hint full">每月工作天數只影響平日正常時間的跳表速度，加班費一律用月薪 ÷ 240 計算。加班未滿一個單位的部分不計。</p>
       <label class="check full"><input type="checkbox" id="lunchPaid"> 休息時間也算錢（不扣午休）</label>
     </div>
+    <p class="sub">勞健保與勞退</p>
+    <div class="form">
+      <label>勞保投保薪資<input type="number" id="insLabor" min="0" step="100" inputmode="numeric" placeholder="自動"></label>
+      <label>健保投保金額<input type="number" id="insHealth" min="0" step="100" inputmode="numeric" placeholder="自動"></label>
+      <label>健保眷屬人數<input type="number" id="insDep" min="0" max="10" step="1" inputmode="numeric"></label>
+      <label>&nbsp;<span class="hint">投保金額留空就依月薪自動對照分級表</span></label>
+      <label class="check full"><input type="checkbox" id="insNet"> 跳表直接顯示扣掉勞健保後的實領</label>
+      <p class="rule full" id="insSummary"></p>
+    </div>
     <p class="sub">班別（輪班的人可以三個都設定，不輪班只用第一個就好）</p>
     <div class="shifts" id="shifts"></div>
     <p class="hint">設定只存在這台裝置的瀏覽器裡。預設值是範例，改成你自己的就好。加班費依勞基法第 24、39 條估算，實際以公司規定與薪資單為準。</p>
@@ -332,7 +372,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       { name: "小夜班", start: "16:00", end: "00:00", bs: "20:00", be: "20:30" },
       { name: "大夜班", start: "00:00", end: "08:00", bs: "04:00", be: "04:30" }
     ],
-    today: { type: "normal", shift: 0, punch: 0, dutyPay: 1500, date: "" }
+    today: { type: "normal", shift: 0, punch: 0, dutyPay: 1500, date: "", leave: { kind: "", from: "", to: "" } },
+    ins: { labor: 0, health: 0, dependents: 0, net: true }
   };
   var TYPES = [
     { id: "normal",  label: "平日上班" },
@@ -341,6 +382,22 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     { id: "duty",    label: "值班" },
     { id: "off",     label: "放假" }
   ];
+  // Leave types and the share of pay you keep (勞工請假規則)
+  var LEAVES = {
+    annual:    { label: "特休", ratio: 1 },
+    personal:  { label: "事假", ratio: 0 },
+    sick:      { label: "病假（半薪）", ratio: 0.5 },
+    menstrual: { label: "生理假（半薪）", ratio: 0.5 },
+    family:    { label: "家庭照顧假", ratio: 0 },
+    paid:      { label: "婚假／喪假／公假", ratio: 1 },
+    unpaid:    { label: "其他無薪假", ratio: 0 }
+  };
+  // 115 年（2026）投保分級表；勞退提繳工資對照健保級距，上限 150,000
+  var LABOR_GRADES = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800];
+  var HEALTH_GRADES = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800, 48200, 50600, 53000,
+    55400, 57800, 60800, 63800, 66800, 69800, 72800, 76500, 80200, 83900, 87600, 92100, 96600, 101100, 105600, 110100,
+    115500, 120900, 126300, 131700, 137100, 142500, 147900, 150000, 156400, 162800, 169200, 175600, 182000, 189500,
+    197000, 204500, 212000, 219500, 228200, 236900, 245600, 254300, 263000, 273000, 283000, 293000, 303000, 313000];
   var ITEMS = [
     { name: "茶葉蛋", price: 13 },
     { name: "超商咖啡", price: 45 },
@@ -364,6 +421,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       }
       cfg = Object.assign(cfg, saved);
       cfg.today = Object.assign({}, DEFAULTS.today, saved.today || {});
+      cfg.ins = Object.assign({}, DEFAULTS.ins, saved.ins || {});
       delete cfg.today.otEnd;            // planned overtime from the second version
     }
   } catch (e) {}
@@ -393,6 +451,48 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   });
   $("lunchPaid").checked = !!cfg.lunchPaid;
   $("lunchPaid").addEventListener("change", function () { cfg.lunchPaid = $("lunchPaid").checked; save(); refresh(); });
+
+  /* ---------- Labor / health insurance and pension ---------- */
+  function grade(amount, table) {
+    for (var i = 0; i < table.length; i++) if (amount <= table[i]) return table[i];
+    return table[table.length - 1];
+  }
+  function insurance() {
+    var lg = cfg.ins.labor || grade(cfg.salary, LABOR_GRADES);
+    var hg = cfg.ins.health || grade(cfg.salary, HEALTH_GRADES);
+    var pg = Math.min(150000, grade(cfg.salary, HEALTH_GRADES));
+    var persons = 1 + Math.min(3, cfg.ins.dependents || 0);
+    return {
+      lg: lg, hg: hg, pg: pg, persons: persons,
+      labor: Math.round(lg * 0.125 * 0.2),               // 普通事故 11.5% + 就業保險 1%，自付 20%
+      health: Math.round(hg * 0.0517 * 0.3) * persons,   // 費率 5.17%，自付 30%，眷屬最多計 3 口
+      pension: Math.round(pg * 0.06)                      // 雇主提撥 6%，不從薪水扣
+    };
+  }
+  function netFactor() {
+    if (!cfg.ins.net || !(cfg.salary > 0)) return 1;
+    var x = insurance();
+    return Math.max(0, (cfg.salary - x.labor - x.health) / cfg.salary);
+  }
+  function renderIns() {
+    var x = insurance();
+    $("insLabor").placeholder = "自動：" + fmt(grade(cfg.salary, LABOR_GRADES));
+    $("insHealth").placeholder = "自動：" + fmt(grade(cfg.salary, HEALTH_GRADES));
+    $("insSummary").innerHTML = "每月自付：勞保 <b>NT$" + fmt(x.labor) + "</b>（" + fmt(x.lg) + " × 12.5% × 20%）、健保 <b>NT$" + fmt(x.health) +
+      "</b>（" + fmt(x.hg) + " × 5.17% × 30% × " + x.persons + " 人）。公司另外提撥勞退 <b>NT$" + fmt(x.pension) + "</b>（" + fmt(x.pg) +
+      " × 6%），存進你的個人帳戶，不從薪水扣。依 115 年分級表估算，實際以薪資單為準。";
+  }
+  $("insLabor").value = cfg.ins.labor || "";
+  $("insHealth").value = cfg.ins.health || "";
+  $("insDep").value = cfg.ins.dependents;
+  $("insNet").checked = !!cfg.ins.net;
+  [["insLabor", "labor"], ["insHealth", "health"], ["insDep", "dependents"]].forEach(function (f) {
+    $(f[0]).addEventListener("input", function () {
+      var v = parseInt($(f[0]).value, 10);
+      cfg.ins[f[1]] = v > 0 ? v : 0; save(); refresh();
+    });
+  });
+  $("insNet").addEventListener("change", function () { cfg.ins.net = $("insNet").checked; save(); refresh(); });
 
   cfg.shifts.forEach(function (s, i) {
     var row = document.createElement("div");
@@ -455,6 +555,27 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     if (p <= sh.s) p += 864e5;
     setToday({ punch: p });
   });
+  function fillLeaveSelect(sel) {
+    sel.innerHTML = '<option value="">沒有請假</option>';
+    Object.keys(LEAVES).forEach(function (k) {
+      var o = document.createElement("option");
+      o.value = k; o.textContent = LEAVES[k].label;
+      sel.appendChild(o);
+    });
+  }
+  fillLeaveSelect($("leaveKind"));
+  fillLeaveSelect($("lfLeave"));
+  $("leaveKind").addEventListener("change", function () {
+    var k = $("leaveKind").value, def = cfg.shifts[cfg.today.shift] || cfg.shifts[0], lv = cfg.today.leave || {};
+    setToday({ leave: k ? { kind: k, from: lv.from || def.start, to: lv.to || def.end } : { kind: "", from: "", to: "" } });
+  });
+  [["leaveFrom", "from"], ["leaveTo", "to"]].forEach(function (f) {
+    $(f[0]).addEventListener("change", function () {
+      if (!$(f[0]).value) return;
+      var lv = Object.assign({}, cfg.today.leave); lv[f[1]] = $(f[0]).value;
+      setToday({ leave: lv });
+    });
+  });
   $("punchClear").addEventListener("click", function () { setToday({ punch: 0, otConfirmed: false }); });
   $("askOt").addEventListener("click", function () {
     setToday({ otConfirmed: true });
@@ -474,6 +595,12 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     if (document.activeElement !== $("punchTime")) $("punchTime").value = T.punch ? hm(T.punch) : "";
     if (document.activeElement !== $("dutyPay")) $("dutyPay").value = T.dutyPay;
     $("dutyWrap").hidden = T.type !== "duty";
+    var lv = T.leave || {};
+    $("leaveWrap").hidden = T.type !== "normal";
+    $("leaveKind").value = lv.kind || "";
+    $("leaveTimeWrap").hidden = T.type !== "normal" || !lv.kind;
+    if (document.activeElement !== $("leaveFrom")) $("leaveFrom").value = lv.from || "";
+    if (document.activeElement !== $("leaveTo")) $("leaveTo").value = lv.to || "";
   }
 
   /* ---------- Time math ---------- */
@@ -499,7 +626,24 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Paid time stops at the punch; without one, at the scheduled end unless you said you're still working
     sh.fe = punched ? p : (sh.confirmed ? sh.cap : e);
     sh.regMs = rawWorked(sh, e);
+    // Leave: only on a normal workday; the leave window is paid at the leave type's ratio
+    var lv = td.type === "normal" && td.leave && td.leave.kind && LEAVES[td.leave.kind] ? td.leave : null;
+    sh.ls = sh.le = 0; sh.leaveRatio = 1; sh.leaveToEnd = false;
+    if (lv && lv.from && lv.to) {
+      var ls = at(day, lv.from), le = at(day, lv.to);
+      if (ls < s) { ls += 864e5; le += 864e5; }
+      if (le <= ls) le += 864e5;
+      sh.ls = ls; sh.le = le; sh.leaveRatio = LEAVES[lv.kind].ratio; sh.leaveToEnd = le >= e;
+    }
+    sh.leaveMs = leaveIn(sh, s, e);
     return sh;
+  }
+  // Leave time inside [a, b], break removed unless paid
+  function leaveIn(sh, a, b) {
+    if (!sh.le) return 0;
+    var x = overlap(a, b, sh.ls, sh.le);
+    if (!cfg.lunchPaid) x -= overlap(Math.max(a, sh.ls), Math.min(b, sh.le), sh.bs, sh.be);
+    return Math.max(0, x);
   }
   function currentShift(now) {
     var today = shiftFor(now);
@@ -544,9 +688,11 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var T = td.type, w = worked(sh, t);
     var hourly = cfg.salary / 240, daily = cfg.salary / cfg.days;
     var ot = floorUnit(otRaw(sh, t, td), exact);
-    var r = { base: 0, extra: 0, ot: ot };
+    var r = { base: 0, extra: 0, ot: ot, deduct: 0 };
     if (T === "normal") {
-      r.base = sh.regMs > 0 ? daily * Math.min(w, sh.regMs) / sh.regMs : 0;
+      var lost = leaveIn(sh, sh.s, Math.min(t, sh.fe, sh.e)) * (1 - sh.leaveRatio);
+      r.base = sh.regMs > 0 ? daily * Math.max(0, Math.min(w, sh.regMs) - lost) / sh.regMs * netFactor() : 0;
+      r.deduct = Math.round(sh.leaveMs / H * cfg.salary / 240 * (1 - sh.leaveRatio));   // 月薪 ÷ 240 per hour
       r.extra = tiered(ot, RULES.normal, hourly);
     } else if (T === "rest") {
       r.extra = tiered(ot, RULES.rest, hourly);
@@ -589,6 +735,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
   var lastOt = null;
   function refresh() {
+    renderIns();
     $("perDay").textContent = fmt(cfg.salary / cfg.days);
     $("otBase").textContent = fmt(cfg.salary / 240);
     $("rule").innerHTML = ruleText();
@@ -602,7 +749,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var now = new Date(), t = +now, sh = currentShift(now);
     var key = dateKey(sh.s);
     if (cfg.today.date && cfg.today.date !== key) {   // new day: back to a normal workday
-      cfg.today.type = "normal"; cfg.today.punch = 0; cfg.today.otConfirmed = false; cfg.today.date = key;
+      cfg.today.type = "normal"; cfg.today.punch = 0; cfg.today.otConfirmed = false; cfg.today.leave = { kind: "", from: "", to: "" }; cfg.today.date = key;
       save(); renderToday(); $("rule").innerHTML = ruleText(); sh = currentShift(now);
     }
     var T = cfg.today.type;
@@ -620,8 +767,9 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var state, label;
     if (T === "off") { state = "rest"; label = "放假中"; }
     else if (t < sh.s) { state = "before"; label = "上班前"; }
-    else if (t >= sh.e && !sh.punched && !sh.confirmed && t < sh.cap) { state = "ask"; label = "下班了嗎？"; }
+    else if (t >= sh.e && !sh.punched && !sh.confirmed && !sh.leaveToEnd && t < sh.cap) { state = "ask"; label = "下班了嗎？"; }
     else if (t >= sh.fe) { state = "off"; label = "已下班"; }
+    else if (sh.le && t >= sh.ls && t < sh.le) { state = "leave"; label = "請假中"; }
     else if (!cfg.lunchPaid && t >= sh.bs && t < sh.be) { state = "lunch"; label = "休息中"; }
     else if (t >= sh.e) { state = "ot"; label = T === "duty" ? "值班中" : "加班中"; }
     else { state = "work"; label = T === "duty" ? "值班中" : (T === "normal" ? "跳表中" : "假日出勤"); }
@@ -631,7 +779,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var extraName = { normal: "加班費", rest: "休息日加班費", holiday: "假日加發工資", duty: "值班津貼" }[T];
     var otNote = r.ot > 0 ? "（加班計 " + hours(r.ot) + "）" : "";
     if (T === "off") $("split").textContent = "今天放假，月薪照算";
-    else if (T === "normal") $("split").innerHTML = "底薪 <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote;
+    else if (T === "normal") $("split").innerHTML = (cfg.ins.net ? "底薪（已扣勞健保）" : "底薪") + " <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote;
     else $("split").innerHTML = "<span class=\"o\">" + extraName + " <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote + "　月薪另外照領";
 
     var raw = otRaw(sh, t), inOt = T !== "off" && T !== "duty" && t < sh.fe && raw > 0 && state !== "lunch";
@@ -675,9 +823,19 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     lunch.hidden = cfg.lunchPaid || hi <= lo || T === "off";
     lunch.style.left = ((lo - sh.s) / span * 100) + "%";
     lunch.style.width = ((hi - lo) / span * 100) + "%";
+    var lz = $("bar").querySelector(".leavez");
+    if (!lz) { lz = document.createElement("div"); lz.className = "leavez"; $("bar").insertBefore(lz, $("fill")); }
+    var l1 = Math.max(sh.ls, sh.s), l2 = Math.min(sh.le, end);
+    lz.hidden = !sh.le || l2 <= l1 || T === "off";
+    lz.style.left = ((l1 - sh.s) / span * 100) + "%";
+    lz.style.width = ((l2 - l1) / span * 100) + "%";
+    var leaveNote = $("leaveNote");
+    leaveNote.hidden = !(T === "normal" && sh.le);
+    if (!leaveNote.hidden) leaveNote.textContent = LEAVES[cfg.today.leave.kind].label + " " + hours(sh.leaveMs) +
+      (r.deduct ? "，扣薪 NT$" + fmt(r.deduct) + "（月薪 ÷ 240 × 時數 × " + (1 - sh.leaveRatio) + "）" : "，照領薪水");
 
     // Punch-out button
-    var btn = $("punchBtn"), canPunch = T !== "off" && t >= sh.s && t < sh.fe;
+    var btn = $("punchBtn"), canPunch = T !== "off" && state !== "leave" && t >= sh.s && t < sh.fe;
     btn.hidden = !canPunch;
     $("askRow").hidden = state !== "ask";
     $("askText").textContent = "已經過了表定下班時間 " + def.end + "，你還在加班嗎？";
@@ -688,16 +846,27 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     else if (canPunch && t >= sh.e) $("punchInfo").textContent = "加班結束時按一下";
     else $("punchInfo").textContent = "";
 
-    // Month: base salary accrues by calendar time; extras come from the daily log
-    var ms0 = +new Date(now.getFullYear(), now.getMonth(), 1), ms1 = +new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    $("monthBase").textContent = "NT$" + fmt(cfg.salary * (t - ms0) / (ms1 - ms0));
+    // Today's record: extra pay and leave deduction
     var rounded = Math.round(r.extra);
-    var rec = rounded > 0 ? { type: T, shift: cfg.today.shift, punch: sh.punched ? sh.fe : 0, otConfirmed: !!cfg.today.otConfirmed, dutyPay: cfg.today.dutyPay, ot: r.ot, extra: rounded } : null;
+    var rec = rounded > 0 || r.deduct > 0 ? {
+      type: T, shift: cfg.today.shift, punch: sh.punched ? sh.fe : 0, otConfirmed: !!cfg.today.otConfirmed, dutyPay: cfg.today.dutyPay,
+      leave: sh.le ? Object.assign({}, cfg.today.leave) : null, ot: r.ot, extra: rounded, deduct: r.deduct
+    } : null;
     if (JSON.stringify(log[key] || null) !== JSON.stringify(rec)) {
       if (rec) log[key] = rec; else delete log[key];
       saveLog(); renderLog();
     }
-    $("monthExtra").textContent = "NT$" + fmt(monthTotal());
+
+    // Month: salary and insurance accrue by calendar time; extras and leave come from the daily log
+    var ms0 = +new Date(now.getFullYear(), now.getMonth(), 1), ms1 = +new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    var frac = (t - ms0) / (ms1 - ms0), ins = insurance(), m = monthSums();
+    var mBase = cfg.salary * frac, mIns = (ins.labor + ins.health) * frac;
+    $("mBase").textContent = "NT$" + fmt(mBase);
+    $("mExtra").textContent = "+NT$" + fmt(m.extra);
+    $("mLeave").textContent = "−NT$" + fmt(m.deduct);
+    $("mIns").textContent = "−NT$" + fmt(mIns);
+    $("mNet").textContent = "NT$" + fmt(mBase + m.extra - m.deduct - mIns);
+    $("mNote").textContent = "公司每月另外幫你提撥勞退 NT$" + fmt(ins.pension) + " 到個人帳戶，不從薪水扣，這個月目前累積 NT$" + fmt(ins.pension * frac) + "。以上還沒扣所得稅。";
 
     // Buys
     buyEls.forEach(function (b) {
@@ -714,12 +883,17 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   var TYPE_SHORT = { normal: "平日加班", rest: "休息日", holiday: "國定假日", duty: "值班" };
   var WEEK = "日一二三四五六";
   function recExtra(v) { return typeof v === "number" ? v : v.extra; }
+  function recDeduct(v) { return typeof v === "number" ? 0 : (v.deduct || 0); }
   function todayKey() { return dateKey(currentShift(new Date()).s); }
   function parseDay(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function monthTotal() {
-    var ym = dateKey(Date.now()).slice(0, 7), sum = 0;
-    Object.keys(log).forEach(function (k) { if (k.slice(0, 7) === ym) sum += recExtra(log[k]); });
-    return sum;
+  function monthSums() {
+    var ym = dateKey(Date.now()).slice(0, 7), m = { extra: 0, deduct: 0 };
+    Object.keys(log).forEach(function (k) { if (k.slice(0, 7) === ym) { m.extra += recExtra(log[k]); m.deduct += recDeduct(log[k]); } });
+    return m;
+  }
+  function leaveHoursOf(k, v) {
+    var sh = shiftFor(parseDay(k), { type: "normal", shift: v.shift, leave: v.leave, punch: 0 });
+    return hours(sh.leaveMs);
   }
   function renderLog() {
     var ym = dateKey(Date.now()).slice(0, 7), list = $("logList");
@@ -730,12 +904,16 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       var v = log[k], d = parseDay(k), li = document.createElement("li"), info;
       if (typeof v === "number") info = "舊紀錄，沒有詳細資料";
       else {
-        info = "<b>" + TYPE_SHORT[v.type] + "</b>";
-        if (v.punch) info += "・" + hm(v.punch) + " 下班";
-        if (v.ot) info += "・計 " + hours(v.ot);
+        var parts = [];
+        if (v.type !== "normal" || v.ot) parts.push("<b>" + TYPE_SHORT[v.type] + "</b>");
+        if (v.leave && v.leave.kind && LEAVES[v.leave.kind]) parts.push("<b>" + LEAVES[v.leave.kind].label + "</b> " + leaveHoursOf(k, v));
+        info = parts.join("・");
+        if (v.punch && v.ot) info += "・" + hm(v.punch) + " 下班";
+        if (v.ot) info += "・加班計 " + hours(v.ot);
       }
       li.innerHTML = '<span class="d">' + (d.getMonth() + 1) + "/" + d.getDate() + "（" + WEEK[d.getDay()] + '）</span><span class="info">' + info +
-        '</span><span class="amt">NT$' + fmt(recExtra(v)) + '</span><button type="button" class="linkbtn">修改</button>';
+        '</span><span class="amt">' +
+        (recExtra(v) ? '<span class="o">+NT$' + fmt(recExtra(v)) + "</span>" : "") + (recDeduct(v) ? "<span>−NT$" + fmt(recDeduct(v)) + "</span>" : "") + '</span><button type="button" class="linkbtn">修改</button>';
       li.querySelector("button").addEventListener("click", function () { openForm(k); });
       list.appendChild(li);
     });
@@ -747,7 +925,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var k = $("lfDate").value;
     if (!k || !$("lfPunch").value) return null;
     var day = parseDay(k);
-    var td = { type: $("lfType").value, shift: +$("lfShift").value, punch: 0, dutyPay: parseFloat($("lfDuty").value) || 0, otConfirmed: false };
+    var td = { type: $("lfType").value, shift: +$("lfShift").value, punch: 0, dutyPay: parseFloat($("lfDuty").value) || 0, otConfirmed: false,
+      leave: $("lfLeave").value ? { kind: $("lfLeave").value, from: $("lfLeaveFrom").value, to: $("lfLeaveTo").value } : { kind: "", from: "", to: "" } };
     var p = at(shiftFor(day, td).s, $("lfPunch").value), s0 = shiftFor(day, td).s;
     if (p <= s0) p += 864e5;
     td.punch = p;
@@ -756,10 +935,18 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   }
   function updatePreview() {
     $("lfDutyWrap").hidden = $("lfType").value !== "duty";
+    var normal = $("lfType").value === "normal", def = cfg.shifts[+$("lfShift").value] || cfg.shifts[0];
+    $("lfLeaveWrap").hidden = !normal;
+    if (!normal) $("lfLeave").value = "";
+    $("lfLeaveTimeWrap").hidden = !$("lfLeave").value;
+    if ($("lfLeave").value && !$("lfLeaveFrom").value) $("lfLeaveFrom").value = def.start;
+    if ($("lfLeave").value && !$("lfLeaveTo").value) $("lfLeaveTo").value = def.end;
     var f = formDay();
-    $("lfPreview").innerHTML = f
-      ? "這天另外賺 <b>NT$" + fmt(f.r.extra) + "</b>" + (f.r.ot > 0 ? "（加班計 " + hours(f.r.ot) + "）" : "") + (Math.round(f.r.extra) > 0 ? "" : "，儲存後這天不會列在紀錄裡。")
-      : "填好日期和下班時間就會算出金額。";
+    if (!f) { $("lfPreview").innerHTML = "填好日期和下班時間就會算出金額。"; return; }
+    var bits = [];
+    if (Math.round(f.r.extra) > 0) bits.push("另外賺 <b>NT$" + fmt(f.r.extra) + "</b>" + (f.r.ot > 0 ? "（加班計 " + hours(f.r.ot) + "）" : ""));
+    if (f.r.deduct > 0) bits.push("請假扣薪 <b>NT$" + fmt(f.r.deduct) + "</b>");
+    $("lfPreview").innerHTML = bits.length ? "這天" + bits.join("，") + "。" : "這天沒有加班費也沒有扣薪，儲存後不會列在紀錄裡。";
   }
   function openForm(k) {
     editingKey = k || null;
@@ -770,13 +957,15 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     $("lfShift").value = shiftIdx;
     $("lfPunch").value = rec && rec.punch ? hm(rec.punch) : def0.end;
     $("lfDuty").value = rec ? rec.dutyPay : cfg.today.dutyPay;
+    var lv = rec && rec.leave ? rec.leave : { kind: "", from: "", to: "" };
+    $("lfLeave").value = lv.kind; $("lfLeaveFrom").value = lv.from; $("lfLeaveTo").value = lv.to;
     $("lfDelete").hidden = !k;
     $("logForm").hidden = false;
     updatePreview();
     $("lfDate").focus();
   }
   function closeForm() { $("logForm").hidden = true; editingKey = null; }
-  ["lfDate", "lfType", "lfShift", "lfPunch", "lfDuty"].forEach(function (id) {
+  ["lfDate", "lfType", "lfShift", "lfPunch", "lfDuty", "lfLeave", "lfLeaveFrom", "lfLeaveTo"].forEach(function (id) {
     $(id).addEventListener("input", updatePreview);
     $(id).addEventListener("change", updatePreview);
   });
@@ -786,7 +975,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var k = editingKey;
     if (!k) return;
     delete log[k]; saveLog();
-    if (k === todayKey()) setToday({ type: "normal", punch: 0, otConfirmed: false });
+    if (k === todayKey()) setToday({ type: "normal", punch: 0, otConfirmed: false, leave: { kind: "", from: "", to: "" } });
     renderLog(); closeForm(); tick();
     toast("已刪除 " + k + " 的紀錄");
   });
@@ -796,10 +985,11 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     if (!f) return;
     if (editingKey && editingKey !== f.key) delete log[editingKey];
     if (f.key === todayKey()) {
-      setToday({ type: f.td.type, shift: f.td.shift, punch: f.td.punch, dutyPay: f.td.dutyPay, otConfirmed: false });
+      setToday({ type: f.td.type, shift: f.td.shift, punch: f.td.punch, dutyPay: f.td.dutyPay, otConfirmed: false, leave: f.td.leave });
     } else {
       var extra = Math.round(f.r.extra);
-      if (extra > 0) log[f.key] = { type: f.td.type, shift: f.td.shift, punch: f.td.punch, otConfirmed: false, dutyPay: f.td.dutyPay, ot: f.r.ot, extra: extra };
+      if (extra > 0 || f.r.deduct > 0) log[f.key] = { type: f.td.type, shift: f.td.shift, punch: f.td.punch, otConfirmed: false, dutyPay: f.td.dutyPay,
+        leave: f.r.deduct > 0 || f.td.leave.kind ? f.td.leave : null, ot: f.r.ot, extra: extra, deduct: f.r.deduct };
       else delete log[f.key];
     }
     saveLog(); renderLog(); closeForm(); tick();
