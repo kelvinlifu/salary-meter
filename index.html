@@ -341,7 +341,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   <details class="card" id="settingsBox">
     <summary>我的薪水與班別設定</summary>
     <div class="form">
-      <label class="full">月薪（NT$）<input type="number" id="salary" min="0" step="500" inputmode="numeric"></label>
+      <label>月薪（NT$）<input type="number" id="salary" min="0" step="500" inputmode="numeric"></label>
+      <label>到職日（剛到職才需要填）<input type="date" id="startDate"></label>
       <label>每月工作天數<input type="number" id="days" min="1" max="31" step="1" inputmode="numeric"></label>
       <label>加班計算單位（分鐘）<input type="number" id="otUnit" min="1" max="60" step="1" inputmode="numeric"></label>
       <p class="hint full">每月工作天數只影響平日正常時間的跳表速度，加班費一律用月薪 ÷ 240 計算。加班未滿一個單位的部分不計。</p>
@@ -441,6 +442,9 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   function dateKey(ms) { var d = new Date(ms); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
 
   /* ---------- Settings form ---------- */
+  $("startDate").value = cfg.startDate || "";
+  $("startDate").addEventListener("change", function () { cfg.startDate = $("startDate").value; save(); refresh(); });
+  function startMs() { return cfg.startDate ? +parseDay(cfg.startDate) : 0; }
   ["salary", "days", "otUnit"].forEach(function (f) {
     $(f).value = cfg[f];
     $(f).addEventListener("input", function () {
@@ -685,6 +689,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   // exact = true skips the per-unit rounding (used for the live rate only)
   function earnedAt(sh, t, exact, td) {
     td = td || cfg.today;
+    if (sh.s < startMs()) return { base: 0, extra: 0, ot: 0, deduct: 0 };   // before your first day
     var T = td.type, w = worked(sh, t);
     var hourly = cfg.salary / 240, daily = cfg.salary / cfg.days;
     var ot = floorUnit(otRaw(sh, t, td), exact);
@@ -765,7 +770,9 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
     // Status
     var state, label;
-    if (T === "off") { state = "rest"; label = "放假中"; }
+    var notYet = t < startMs();
+    if (notYet) { state = "notyet"; label = "還沒到職"; }
+    else if (T === "off") { state = "rest"; label = "放假中"; }
     else if (t < sh.s) { state = "before"; label = "上班前"; }
     else if (t >= sh.e && !sh.punched && !sh.confirmed && !sh.leaveToEnd && t < sh.cap) { state = "ask"; label = "下班了嗎？"; }
     else if (t >= sh.fe) { state = "off"; label = "已下班"; }
@@ -778,7 +785,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Breakdown and the next overtime unit
     var extraName = { normal: "加班費", rest: "休息日加班費", holiday: "假日加發工資", duty: "值班津貼" }[T];
     var otNote = r.ot > 0 ? "（加班計 " + hours(r.ot) + "）" : "";
-    if (T === "off") $("split").textContent = "今天放假，月薪照算";
+    if (notYet) $("split").textContent = "到職後就開始跳表";
+    else if (T === "off") $("split").textContent = "今天放假，月薪照算";
     else if (T === "normal") $("split").innerHTML = (cfg.ins.net ? "底薪（已扣勞健保）" : "底薪") + " <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote;
     else $("split").innerHTML = "<span class=\"o\">" + extraName + " <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote + "　月薪另外照領";
 
@@ -793,7 +801,13 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     lastOt = r.ot;
 
     // Countdown
-    if (T === "off") { $("cdLabel").textContent = "今天"; $("countdown").textContent = "放假"; $("pct").textContent = ""; }
+    if (notYet) {
+      var sd = parseDay(cfg.startDate), left = startMs() - t;
+      $("cdLabel").textContent = "距離到職";
+      $("countdown").textContent = left >= 864e5 ? Math.floor(left / 864e5) + " 天 " + hms(left % 864e5) : hms(left);
+      $("pct").textContent = (sd.getMonth() + 1) + "/" + sd.getDate() + "（" + WEEK[sd.getDay()] + "）開始跳表";
+    }
+    else if (T === "off") { $("cdLabel").textContent = "今天"; $("countdown").textContent = "放假"; $("pct").textContent = ""; }
     else if (state === "before") { $("cdLabel").textContent = "距離上班"; $("countdown").textContent = hms(sh.s - t); $("pct").textContent = ""; }
     else if (state === "ask") { $("cdLabel").textContent = "到下班時間了"; $("countdown").textContent = "下班了嗎？"; $("pct").textContent = ""; }
     else if (state === "off") {
@@ -835,7 +849,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       (r.deduct ? "，扣薪 NT$" + fmt(r.deduct) + "（月薪 ÷ 240 × 時數 × " + (1 - sh.leaveRatio) + "）" : "，照領薪水");
 
     // Punch-out button
-    var btn = $("punchBtn"), canPunch = T !== "off" && state !== "leave" && t >= sh.s && t < sh.fe;
+    var btn = $("punchBtn"), canPunch = T !== "off" && !notYet && state !== "leave" && t >= sh.s && t < sh.fe;
     btn.hidden = !canPunch;
     $("askRow").hidden = state !== "ask";
     $("askText").textContent = "已經過了表定下班時間 " + def.end + "，你還在加班嗎？";
@@ -859,14 +873,23 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
     // Month: salary and insurance accrue by calendar time; extras and leave come from the daily log
     var ms0 = +new Date(now.getFullYear(), now.getMonth(), 1), ms1 = +new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    var frac = (t - ms0) / (ms1 - ms0), ins = insurance(), m = monthSums();
-    var mBase = cfg.salary * frac, mIns = (ins.labor + ins.health) * frac;
+    var ins = insurance(), m = monthSums(), sMs = startMs();
+    // First month: salary, labor insurance and pension are prorated as 在職日數 ÷ 30; health insurance is a full month
+    var from = Math.max(ms0, sMs), firstMonth = sMs > ms0 && sMs < ms1;
+    var days = Math.round((ms1 - from) / 864e5), share = firstMonth ? Math.min(1, days / 30) : 1;
+    var frac = sMs >= ms1 ? 0 : Math.max(0, Math.min(1, (t - from) / (ms1 - from)));
+    var monthPay = cfg.salary * share, pension = ins.pension * share;
+    var mBase = monthPay * frac, mIns = (ins.labor * share + ins.health) * frac;
     $("mBase").textContent = "NT$" + fmt(mBase);
     $("mExtra").textContent = "+NT$" + fmt(m.extra);
     $("mLeave").textContent = "−NT$" + fmt(m.deduct);
     $("mIns").textContent = "−NT$" + fmt(mIns);
     $("mNet").textContent = "NT$" + fmt(mBase + m.extra - m.deduct - mIns);
-    $("mNote").textContent = "公司每月另外幫你提撥勞退 NT$" + fmt(ins.pension) + " 到個人帳戶，不從薪水扣，這個月目前累積 NT$" + fmt(ins.pension * frac) + "。以上還沒扣所得稅。";
+    var sd = cfg.startDate ? parseDay(cfg.startDate) : null;
+    var lead = sMs >= ms1 ? (sd.getMonth() + 1) + "/" + sd.getDate() + " 到職後才開始累積。"
+      : firstMonth ? "這個月從 " + (sd.getMonth() + 1) + "/" + sd.getDate() + " 到職，在職 " + days + " 天：月薪按 " + fmt(cfg.salary) + " × " + days + " ÷ 30 = NT$" + fmt(monthPay) +
+        " 計，勞保按天數計 NT$" + fmt(ins.labor * share) + "，健保月底在職就收整月 NT$" + fmt(ins.health) + "。" : "";
+    $("mNote").textContent = lead + "公司每月另外幫你提撥勞退 NT$" + fmt(pension) + " 到個人帳戶，不從薪水扣，這個月目前累積 NT$" + fmt(pension * frac) + "。以上還沒扣所得稅。";
 
     // Buys
     buyEls.forEach(function (b) {
