@@ -21,7 +21,7 @@ img { max-width: 100%; }
 <title>薪水跳表機</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@300;500&display=swap">
 <style>
 /* Layout: one column like a taxi meter — the big ticking number on top, the day's bar, today's shift type, what the money buys, settings folded at the bottom. */
 :root {
@@ -41,6 +41,7 @@ img { max-width: 100%; }
   --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --font-odo: "Oswald", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --led: #ff4a3d; --led-glow: rgba(255, 74, 61, .65); --flap: #2b3a49; --flap-low: #1a2633; --flap-gold-low: #e3b448;
   --drum: #1d2c3b; --drum-hi: #2a3e52; --drum-edge: #05090d; --drum-ink: #f3efe4; --cents-edge: #a87a1c;
 }
 @media (prefers-color-scheme: dark) {
@@ -108,6 +109,35 @@ h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; marg
 .odo-strip { display: flex; flex-direction: column; will-change: transform; }
 .odo-strip span { height: 1.24em; display: flex; align-items: center; justify-content: center; }
 .odo-sep { color: var(--meter-dim); width: .28em; text-align: center; align-self: flex-end; padding-bottom: .08em; }
+.odo { cursor: pointer; border-radius: 6px; }
+.odo:focus-visible { outline: 2px solid var(--meter-ink); outline-offset: 4px; }
+/* Red LED: seven segments per digit, unlit segments stay faintly visible like a real taxi meter */
+.st-led { align-items: flex-end; gap: .1em; padding: .1em 0; }
+.led { position: relative; display: inline-block; width: .56em; height: 1em; transform: skewX(-6deg); }
+.led.cents { font-size: .72em; }
+.led i { position: absolute; background: var(--led); opacity: .08; border-radius: .03em; }
+.led i.on { opacity: 1; box-shadow: 0 0 .14em var(--led-glow); }
+.led .a, .led .d, .led .g { left: .09em; right: .09em; height: .085em; }
+.led .a { top: 0; } .led .d { bottom: 0; } .led .g { top: calc(50% - .0425em); }
+.led .b, .led .c, .led .e, .led .f { width: .085em; height: calc(50% - .1em); }
+.led .b { right: 0; top: .07em; } .led .c { right: 0; bottom: .07em; }
+.led .e { left: 0; bottom: .07em; } .led .f { left: 0; top: .07em; }
+.st-led .odo-sep { color: var(--led); text-shadow: 0 0 .14em var(--led-glow); width: .16em; padding-bottom: 0; line-height: .8; }
+/* Split-flap cards */
+.flap {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;
+  width: .72em; height: 1.22em; border-radius: .1em; color: var(--drum-ink);
+  background: linear-gradient(180deg, var(--flap) 0 49.6%, var(--flap-low) 50.4% 100%); box-shadow: 0 .04em .1em rgba(0, 0, 0, .5);
+}
+.flap.cents { background: linear-gradient(180deg, var(--meter-ink) 0 49.6%, var(--flap-gold-low) 50.4% 100%); color: var(--meter); }
+.flap::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - .015em); height: .03em; background: rgba(0, 0, 0, .6); }
+.flap .t { display: block; }
+.flap.go .t { animation: flip .16s ease-out; }
+@keyframes flip { from { transform: perspective(2em) rotateX(-80deg); opacity: .3; } to { transform: none; opacity: 1; } }
+/* Plain big numbers */
+.st-plain { align-items: baseline; font-weight: 300; font-size: clamp(3rem, 15vw, 5rem); color: var(--meter-ink); text-shadow: 0 0 24px rgba(255, 209, 102, .25); font-variant-numeric: tabular-nums; }
+.st-plain small { font-size: .45em; opacity: .75; margin-left: .04em; }
+@media (prefers-reduced-motion: reduce) { .flap.go .t { animation: none; } }
 .split { font-size: .85rem; color: var(--meter-dim); margin: -6px 0 0; font-variant-numeric: tabular-nums; }
 .split b { font-family: var(--font-num); font-weight: 500; color: #e9eef3; }
 .split .o { color: var(--ot); }
@@ -344,6 +374,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <label>月薪（NT$）<input type="number" id="salary" min="0" step="500" inputmode="numeric"></label>
       <label>到職日（剛到職才需要填）<input type="date" id="startDate"></label>
       <label>每月工作天數<input type="number" id="days" min="1" max="31" step="1" inputmode="numeric"></label>
+      <label>數字風格（點一下數字也能換）<select id="numStyle"></select></label>
       <label>加班計算單位（分鐘）<input type="number" id="otUnit" min="1" max="60" step="1" inputmode="numeric"></label>
       <p class="hint full">每月工作天數只影響平日正常時間的跳表速度，加班費一律用月薪 ÷ 240 計算。加班未滿一個單位的部分不計。</p>
       <label class="check full"><input type="checkbox" id="lunchPaid"> 休息時間也算錢（不扣午休）</label>
@@ -1019,6 +1050,77 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     toast("已儲存 " + f.key + " 的紀錄");
   });
 
+  /* ---------- Number styles ---------- */
+  var STYLES = [
+    { id: "odo", label: "機械滾輪" },
+    { id: "led", label: "紅色 LED" },
+    { id: "flap", label: "翻牌" },
+    { id: "plain", label: "極簡大字" }
+  ];
+  var SEGS = { 0: "abcdef", 1: "bc", 2: "abdeg", 3: "abcdg", 4: "bcfg", 5: "acdfg", 6: "acdefg", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+  STYLES.forEach(function (st) {
+    var o = document.createElement("option"); o.value = st.id; o.textContent = st.label; $("numStyle").appendChild(o);
+  });
+  $("numStyle").value = cfg.numStyle || "odo";
+  function setStyle(id) { cfg.numStyle = id; $("numStyle").value = id; built = ""; save(); }
+  $("numStyle").addEventListener("change", function () { setStyle($("numStyle").value); });
+  function cycleStyle() {
+    var i = STYLES.map(function (x) { return x.id; }).indexOf(cfg.numStyle || "odo");
+    var next = STYLES[(i + 1) % STYLES.length];
+    setStyle(next.id); toast("數字風格：" + next.label);
+  }
+  $("earned").tabIndex = 0;
+  $("earned").addEventListener("click", cycleStyle);
+  $("earned").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleStyle(); } });
+
+  // LED, flap and plain redraw only the characters that changed
+  var built = "", chars = [];
+  function renderChars(v, kind) {
+    var str = Math.floor(v).toLocaleString("en-US") + "." + v.toFixed(2).split(".")[1];
+    var key = kind + str.length;
+    if (built !== key) {
+      odo.className = "odo st-" + kind; odo.innerHTML = ""; chars = []; cells = [];
+      if (kind === "plain") {
+        odo.innerHTML = "<span></span><small></small>";
+        chars = [{ el: odo.firstChild, d: null }, { el: odo.lastChild, d: null }];
+      } else {
+        var dot = str.indexOf(".");
+        str.split("").forEach(function (ch, i) {
+          var el = document.createElement("span");
+          if (!/[0-9]/.test(ch)) { el.className = "odo-sep"; el.textContent = ch; }
+          else if (kind === "led") { el.className = "led" + (i > dot ? " cents" : ""); el.innerHTML = "<i class=a></i><i class=b></i><i class=c></i><i class=d></i><i class=e></i><i class=f></i><i class=g></i>"; }
+          else { el.className = "flap" + (i > dot ? " cents" : ""); el.innerHTML = '<span class="t"></span>'; }
+          odo.appendChild(el);
+          chars.push({ el: el, d: /[0-9]/.test(ch) ? null : ch });
+        });
+      }
+      built = key;
+    }
+    if (kind === "plain") {
+      var parts = str.split(".");
+      if (chars[0].d !== parts[0]) { chars[0].el.textContent = parts[0]; chars[0].d = parts[0]; }
+      if (chars[1].d !== parts[1]) { chars[1].el.textContent = "." + parts[1]; chars[1].d = parts[1]; }
+      return;
+    }
+    str.split("").forEach(function (ch, i) {
+      var c = chars[i];
+      if (c.d === ch) return;
+      c.d = ch;
+      if (kind === "led") {
+        var on = SEGS[ch];
+        Array.prototype.forEach.call(c.el.children, function (seg) { seg.classList.toggle("on", on.indexOf(seg.className.charAt(0)) >= 0); });
+      } else {
+        c.el.firstChild.textContent = ch;
+        c.el.classList.remove("go"); void c.el.offsetWidth; c.el.classList.add("go");
+      }
+    });
+  }
+  function renderMeter(v) {
+    var st = cfg.numStyle || "odo";
+    if (st === "odo") renderOdo(v); else renderChars(v, st);
+    odo.setAttribute("aria-label", "NT$" + v.toFixed(2) + "，點一下換數字風格");
+  }
+
   /* ---------- Odometer ---------- */
   var odo = $("earned"), cells = [], shown = 0, lastSh = null, lastFrame = 0;
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1037,7 +1139,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   }
   function renderOdo(v) {
     var n = String(Math.floor(v)).length;
-    if (cells.length !== n + 2) buildOdo(n);
+    if (built !== "odo" + n) { odo.className = "odo"; buildOdo(n); built = "odo" + n; }
     var u = Math.max(0, v * 100), units = Math.floor(u);
     var low = reduce ? units % 10 : u % 10;          // the cent drum turns continuously
     var carry = reduce ? 0 : Math.max(0, low - 9);   // higher drums turn only while every drum below shows 9
@@ -1047,7 +1149,6 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       if (c.place > 0 && d !== 9) carry = 0;
       c.strip.style.transform = "translateY(" + (-pos / 11 * 100) + "%)";
     }
-    odo.setAttribute("aria-label", "NT$" + v.toFixed(2));
   }
   function frame(ts) {
     var dt = lastFrame ? ts - lastFrame : 16; lastFrame = ts;
@@ -1057,7 +1158,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Big jumps (opening the app, overtime landing) roll up; normal ticking follows exactly
     if (reduce || Math.abs(gap) < 0.5) shown = actual;
     else shown += gap * (1 - Math.exp(-dt / 280));
-    renderOdo(shown);
+    renderMeter(shown);
     requestAnimationFrame(frame);
   }
 
