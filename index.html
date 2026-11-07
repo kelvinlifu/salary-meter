@@ -21,7 +21,7 @@ img { max-width: 100%; }
 <title>薪水跳表機</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@300;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@300;500&display=swap">
 <style>
 /* Layout: one column like a taxi meter — the big ticking number on top, the day's bar, today's shift type, what the money buys, settings folded at the bottom. */
 :root {
@@ -37,8 +37,8 @@ img { max-width: 100%; }
   --bill-soft: #dbe8f5;
   --lunch: #c9a227;
   --ot: #d4553a;         /* overtime */
-  --font-display: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
-  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-display: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-body: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --font-odo: "Oswald", "Arial Narrow", "Roboto Condensed", sans-serif;
   --led: #ff4a3d; --led-glow: rgba(255, 74, 61, .65); --flap: #2b3a49; --flap-low: #1a2633; --flap-gold-low: #e3b448;
@@ -782,12 +782,14 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
   /* ---------- Main loop ---------- */
   function tick() {
+    if (document.hidden) return;                     // nothing to see in the background: save the battery
     var now = new Date(), t = +now, sh = currentShift(now);
     var key = dateKey(sh.s);
     if (cfg.today.date && cfg.today.date !== key) {   // new day: back to a normal workday
       cfg.today.type = "normal"; cfg.today.punch = 0; cfg.today.otConfirmed = false; cfg.today.leave = { kind: "", from: "", to: "" }; cfg.today.date = key;
       save(); renderToday(); $("rule").innerHTML = ruleText(); sh = currentShift(now);
     }
+    if (dateKey(t).slice(0, 7) !== logYm) renderLog(); // a new month: drop last month's records from the list
     var T = cfg.today.type;
     $("clock").textContent = pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
 
@@ -949,8 +951,10 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var sh = shiftFor(parseDay(k), { type: "normal", shift: v.shift, leave: v.leave, punch: 0 });
     return hours(sh.leaveMs);
   }
+  var logYm = "";
   function renderLog() {
     var ym = dateKey(Date.now()).slice(0, 7), list = $("logList");
+    logYm = ym;
     var keys = Object.keys(log).filter(function (k) { return k.slice(0, 7) === ym; }).sort().reverse();
     list.innerHTML = "";
     if (!keys.length) { list.innerHTML = '<li class="empty">這個月還沒有加班紀錄。</li>'; return; }
@@ -1122,7 +1126,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   }
 
   /* ---------- Odometer ---------- */
-  var odo = $("earned"), cells = [], shown = 0, lastSh = null, lastFrame = 0;
+  var odo = $("earned"), cells = [], shown = 0, drawn = null, lastSh = null, lastFrame = 0;
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   var STRIP = "01234567890".split("").map(function (d) { return "<span>" + d + "</span>"; }).join("");
   function buildOdo(intDigits) {
@@ -1158,7 +1162,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Big jumps (opening the app, overtime landing) roll up; normal ticking follows exactly
     if (reduce || Math.abs(gap) < 0.5) shown = actual;
     else shown += gap * (1 - Math.exp(-dt / 280));
-    renderMeter(shown);
+    if (shown !== drawn || !built) { renderMeter(shown); drawn = shown; }
     requestAnimationFrame(frame);
   }
 
@@ -1168,6 +1172,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   renderLog();
   refresh();
   setInterval(tick, 200);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); });
   requestAnimationFrame(frame);
 })();
 </script>
