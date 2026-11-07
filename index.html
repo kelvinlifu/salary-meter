@@ -201,6 +201,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 .form input[type="text"], .form select { font-family: var(--font-body); }
 .inline { display: flex; gap: 6px; }
 .inline button { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 0 12px; cursor: pointer; white-space: nowrap; }
+.workdays { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
 .check { flex-direction: row !important; align-items: center; gap: 8px !important; color: var(--ink) !important; }
 .hint { font-size: .8rem; color: var(--muted); margin: 0; }
 .sub { font-size: .82rem; font-weight: 700; color: var(--ink); margin: 6px 0 0; }
@@ -378,6 +379,10 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <label>加班計算單位（分鐘）<input type="number" id="otUnit" min="1" max="60" step="1" inputmode="numeric"></label>
       <p class="hint full">每月工作天數只影響平日正常時間的跳表速度，加班費一律用月薪 ÷ 240 計算。加班未滿一個單位的部分不計。</p>
       <label class="check full"><input type="checkbox" id="lunchPaid"> 休息時間也算錢（不扣午休）</label>
+      <div class="full">
+        <p class="hint">上班日（沒勾的日子一過 0 點自動算「放假」，當天要上班再改就好）</p>
+        <div class="workdays" id="workDays"></div>
+      </div>
     </div>
     <p class="sub">勞健保與勞退</p>
     <div class="form">
@@ -399,6 +404,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 (function () {
   var DEFAULTS = {
     salary: 42000, days: 22, otUnit: 30, lunchPaid: false,
+    workDays: [1, 2, 3, 4, 5],                    // getDay() of the workdays; the rest start as 放假
     shifts: [
       { name: "日班",   start: "09:00", end: "18:00", bs: "12:00", be: "13:00" },
       { name: "小夜班", start: "16:00", end: "00:00", bs: "20:00", be: "20:30" },
@@ -486,6 +492,17 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   });
   $("lunchPaid").checked = !!cfg.lunchPaid;
   $("lunchPaid").addEventListener("change", function () { cfg.lunchPaid = $("lunchPaid").checked; save(); refresh(); });
+  "日一二三四五六".split("").forEach(function (name, d) {
+    var l = document.createElement("label"), box = document.createElement("input");
+    l.className = "check"; box.type = "checkbox"; box.checked = cfg.workDays.indexOf(d) >= 0;
+    box.addEventListener("change", function () {
+      cfg.workDays = cfg.workDays.filter(function (x) { return x !== d; });
+      if (box.checked) cfg.workDays.push(d);
+      save();
+    });
+    l.appendChild(box); l.appendChild(document.createTextNode("週" + name));
+    $("workDays").appendChild(l);
+  });
 
   /* ---------- Labor / health insurance and pension ---------- */
   function grade(amount, table) {
@@ -788,8 +805,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     if (document.hidden) return;                     // nothing to see in the background: save the battery
     var now = new Date(), t = +now, sh = currentShift(now);
     var key = dateKey(sh.s);
-    if (cfg.today.date && cfg.today.date !== key) {   // new day: back to a normal workday
-      cfg.today.type = "normal"; cfg.today.punch = 0; cfg.today.otConfirmed = false; cfg.today.leave = { kind: "", from: "", to: "" }; cfg.today.date = key;
+    if (cfg.today.date && cfg.today.date !== key) {   // new day: a workday, or 放假 on a day not in workDays
+      cfg.today.type = cfg.workDays.indexOf(new Date(sh.s).getDay()) >= 0 ? "normal" : "off"; cfg.today.punch = 0; cfg.today.otConfirmed = false; cfg.today.leave = { kind: "", from: "", to: "" }; cfg.today.date = key;
       save(); renderToday(); $("rule").innerHTML = ruleText(); sh = currentShift(now);
     }
     if (dateKey(t).slice(0, 7) !== logYm) renderLog(); // a new month: drop last month's records from the list
