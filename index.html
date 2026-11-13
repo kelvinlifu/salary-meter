@@ -24,7 +24,7 @@ img { max-width: 100%; }
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@300;500&display=swap">
 <style>
-/* Layout: one column like a taxi meter — the big ticking number on top, the day's bar, today's shift type, what the money buys, settings folded at the bottom. */
+/* Layout: one column like a taxi meter — the big ticking number on top, the day's bar, today's shift type, the month, settings folded at the bottom. */
 :root {
   --bg: #eef1f4;
   --panel: #ffffff;
@@ -177,14 +177,12 @@ h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; marg
 .rule b { color: var(--ink); font-weight: 500; }
 
 /* Buys */
-.buys { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.buys li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-.buys .row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-.buys .name { font-weight: 500; }
-.buys .cnt { font-family: var(--font-num); font-weight: 600; font-size: 1.2rem; font-variant-numeric: tabular-nums; color: var(--bill); }
-.buys .mini { height: 4px; background: var(--bill-soft); border-radius: 2px; overflow: hidden; }
-.buys .mini i { display: block; height: 100%; background: var(--bill); width: 0; }
-.buys .price { font-size: .75rem; color: var(--muted); font-family: var(--font-num); }
+.goal-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 1.2rem; }
+.goal-bar { height: 10px; background: var(--bill-soft); border-radius: 5px; overflow: hidden; margin: 10px 0; }
+.goal-bar i { display: block; height: 100%; width: 0; background: var(--bill); }
+.goal-bar + .hint + .hint { margin-top: 6px; }
+#yearBox .ledger { margin-top: 10px; }
+.warn { color: var(--ot); font-weight: 500; font-size: .85rem; }
 
 /* Forms */
 details.card summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; }
@@ -358,8 +356,18 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <div id="mWelfareRow"><dt>職工福利金</dt><dd id="mWelfare">−NT$0</dd></div>
       <div id="mSelfRow"><dt>勞退自提</dt><dd id="mSelf">−NT$0</dd></div>
       <div class="total"><dt>目前實領累積</dt><dd id="mNet">NT$0</dd></div>
+      <div><dt>預估整月實領（加班算到目前）</dt><dd id="mFull">NT$0</dd></div>
+      <div><dt>本月加班（上限 46 小時）</dt><dd id="mOt">0 / 46 小時</dd></div>
     </dl>
     <details class="more"><summary>這些數字怎麼算的</summary><p class="hint" id="mNote"></p></details>
+  </section>
+
+  <section class="card" id="goalCard" hidden>
+    <h2>這個月的存錢目標</h2>
+    <div class="goal-num" id="gNum"></div>
+    <div class="goal-bar"><i id="gBar"></i></div>
+    <p class="hint" id="gNote"></p>
+    <p class="hint" id="gDay"></p>
   </section>
 
   <section class="card">
@@ -381,17 +389,27 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     </form>
   </section>
 
-  <section class="card">
-    <h2>今天賺的錢已經可以買</h2>
-    <ul class="buys" id="buys"></ul>
-  </section>
+  <details class="card" id="yearBox">
+    <summary>今年戰績</summary>
+    <dl class="ledger">
+      <div><dt>今年薪水累計（扣勞健保前）</dt><dd id="yPay"></dd></div>
+      <div><dt>其中加班／值班</dt><dd class="o" id="yExtra"></dd></div>
+      <div><dt>加班時數</dt><dd id="yOt"></dd></div>
+      <div><dt>最長的一次加班</dt><dd id="yMax"></dd></div>
+      <div><dt>請假</dt><dd id="yLeave"></dd></div>
+      <div><dt>今年還有幾次發薪</dt><dd id="yPayLeft"></dd></div>
+    </dl>
+    <p class="hint">薪水用目前的月薪從到職日（或 1 月）算到現在，調過薪的話之前的月份會有落差；加班和請假來自上面存的紀錄。</p>
+  </details>
 
   <details class="card" id="settingsBox">
-    <summary>我的薪水與班別設定</summary>
+    <summary><span>我的薪水與班別設定<span class="warn" id="bkWarn" hidden>　該備份了</span></span></summary>
     <div class="form">
       <label>月薪（NT$）<input type="number" id="salary" min="0" step="500" inputmode="numeric"></label>
       <label>到職日（剛到職才需要填）<input type="date" id="startDate"></label>
       <label>加班費結算到每月幾號（0 = 月底）<input type="number" id="otCut" min="0" max="28" step="1" inputmode="numeric"></label>
+      <label>發薪日是每月幾號（0 = 最後一個工作日）<input type="number" id="payDay" min="0" max="28" step="1" inputmode="numeric"></label>
+      <label>每月存款目標（NT$，0 = 不使用）<input type="number" id="saveGoal" min="0" step="1000" inputmode="numeric"></label>
       <label>數字風格（點一下數字也能換）<select id="numStyle"></select></label>
       <label>加班計算單位（分鐘）<input type="number" id="otUnit" min="1" max="60" step="1" inputmode="numeric"></label>
       <p class="hint full">日薪 = 月薪 ÷ 30，上班日和放假都在上班時間內跳完；本月薪水每天累積，放假也算。加班費一律用月薪 ÷ 240 計算，未滿一個單位的部分不計。加班費結算到 20 號，代表上月 21 日到本月 20 日的加班在本月發薪日一起發。</p>
@@ -421,12 +439,9 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     </div>
     <p class="sub">班別（常日班用第一個；輪班時在「今天是」選日輪或夜輪。休息時間請改成公司實際規定）</p>
     <div class="shifts" id="shifts"></div>
-    <p class="sub">「今天賺的錢已經可以買」清單</p>
-    <div class="form">
-      <label class="full">一行一個：名稱、空格、價格<textarea id="itemsBox" rows="8"></textarea></label>
-    </div>
     <p class="sub">備份</p>
     <div class="lf-btns"><button type="button" class="ghost-btn" id="bkExport">匯出備份檔</button><button type="button" class="ghost-btn" id="bkImport">從備份檔還原</button><input type="file" id="bkFile" accept="application/json,.json" hidden></div>
+    <p class="hint" id="bkLast"></p>
     <p class="hint">設定和紀錄只存在這台裝置的瀏覽器裡，清除瀏覽資料或換手機就會不見，偶爾匯出一份存起來。還原會蓋掉這台裝置目前的設定和紀錄。</p>
     <p class="hint">預設值是範例，改成你自己的就好。加班費依勞基法第 24、39 條估算，實際以公司規定與薪資單為準。</p>
   </details>
@@ -436,7 +451,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 <script>
 (function () {
   var DEFAULTS = {
-    salary: 42000, days: 22, otUnit: 30, lunchPaid: false, otCut: 20, welfare: 0.5, selfPension: 0,
+    salary: 42000, days: 22, otUnit: 30, lunchPaid: false, otCut: 20, payDay: 0, saveGoal: 0, welfare: 0.5, selfPension: 0,
     workDays: [1, 2, 3, 4, 5],                    // getDay() of the workdays; the rest start as 放假
     shifts: [
       { name: "日班",   start: "09:00", end: "18:00", bs: "12:00", be: "13:00" },
@@ -470,16 +485,6 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     55400, 57800, 60800, 63800, 66800, 69800, 72800, 76500, 80200, 83900, 87600, 92100, 96600, 101100, 105600, 110100,
     115500, 120900, 126300, 131700, 137100, 142500, 147900, 150000, 156400, 162800, 169200, 175600, 182000, 189500,
     197000, 204500, 212000, 219500, 228200, 236900, 245600, 254300, 263000, 273000, 283000, 293000, 303000, 313000];
-  var ITEMS = [
-    { name: "茶葉蛋", price: 13 },
-    { name: "超商咖啡", price: 45 },
-    { name: "珍珠奶茶", price: 65 },
-    { name: "雞腿便當", price: 110 },
-    { name: "一碗牛肉麵", price: 220 },
-    { name: "電影票", price: 330 },
-    { name: "火鍋吃到飽", price: 699 },
-    { name: "Switch 遊戲", price: 1790 }
-  ];
   var KEY = "salary-meter-v1", LOGKEY = "salary-meter-extra-log";
   var H = 36e5, MAX_OT = 4 * H;
 
@@ -495,6 +500,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       cfg.today = Object.assign({}, DEFAULTS.today, saved.today || {});
       cfg.ins = Object.assign({}, DEFAULTS.ins, saved.ins || {});
       delete cfg.today.otEnd;            // planned overtime from the second version
+      delete cfg.items;                  // the removed "what it buys" list
       // Old 8-hour evening/night presets that were never edited become the 12-hour day/night rotation
       if (!saved.rota) {
         var s1 = cfg.shifts[1], s2 = cfg.shifts[2];
@@ -532,7 +538,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     });
   });
   // Fields where 0 is a valid answer
-  [["otCut", 0, 28], ["welfare", 0, 5], ["selfPension", 0, 6]].forEach(function (f) {
+  [["otCut", 0, 28], ["payDay", 0, 28], ["saveGoal", 0, 1e7], ["welfare", 0, 5], ["selfPension", 0, 6]].forEach(function (f) {
     $(f[0]).value = cfg[f[0]];
     $(f[0]).addEventListener("input", function () {
       var v = parseFloat($(f[0]).value);
@@ -549,6 +555,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       cfg.workDays = cfg.workDays.filter(function (x) { return x !== d; });
       if (box.checked) cfg.workDays.push(d);
       save();
+      // today's own weekday changed: follow it right away (the shift rotation, when set, decides instead)
+      if (!(cfg.cycle.days.length && cfg.cycle.start) && d === parseDay(todayKey()).getDay()) setToday({ type: box.checked ? "normal" : "off" });
     });
     l.appendChild(box); l.appendChild(document.createTextNode("週" + name));
     $("workDays").appendChild(l);
@@ -874,35 +882,10 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     return "今天放假，月薪照算：跳表在上班時段 " + def.start + "–" + def.end + " 內把<b>月薪 ÷ 30</b> 跳完，休息時間和下班後不跳，跟上班日一樣。「本月薪水」也每天累積，放假一樣會增加。好好休息。";
   }
 
-  /* ---------- Buys list ---------- */
-  var buyEls = [];
-  function buildBuys() {
-    $("buys").innerHTML = "";
-    buyEls = (cfg.items || ITEMS).map(function (it) {
-      var li = document.createElement("li");
-      li.innerHTML = '<div class="row"><span class="name"></span><span class="cnt">0</span></div><div class="mini"><i></i></div><span class="price"></span>';
-      li.querySelector(".name").textContent = it.name;
-      li.querySelector(".price").textContent = "NT$" + it.price.toLocaleString("zh-TW") + "／個";
-      $("buys").appendChild(li);
-      return { cnt: li.querySelector(".cnt"), bar: li.querySelector("i"), it: it, last: null };
-    });
-  }
-  buildBuys();
-  // Your own list: one item per line, the name, a space, the price
-  $("itemsBox").value = (cfg.items || ITEMS).map(function (it) { return it.name + " " + it.price; }).join("\n");
-  $("itemsBox").addEventListener("change", function () {
-    var items = [];
-    $("itemsBox").value.split("\n").forEach(function (line) {
-      var m = line.trim().match(/^(.+?)\s+(\d+(?:\.\d+)?)$/);
-      if (m && +m[2] > 0) items.push({ name: m[1], price: +m[2] });
-    });
-    if (!items.length) { toast("每行寫「名稱 空格 價格」，例如：雞腿便當 110"); return; }
-    cfg.items = items; save(); buildBuys(); refresh();
-  });
-
   /* ---------- Backup ---------- */
   $("bkExport").addEventListener("click", function () {
     var a = document.createElement("a");
+    cfg.lastBackup = dateKey(Date.now()); save(); refresh();
     a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "salary-meter", cfg: cfg, log: log }, null, 1)], { type: "application/json" }));
     a.download = "salary-meter-" + dateKey(Date.now()) + ".json";
     a.click();
@@ -916,13 +899,22 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       var d = null;
       try { d = JSON.parse(fr.result); } catch (e) {}
       $("bkFile").value = "";
-      if (!d || d.app !== "salary-meter" || !d.cfg || !d.log) { toast("這不是薪水跳表機的備份檔"); return; }
+      if (!d || d.app !== "salary-meter") { toast("這不是薪水跳表機的備份檔"); return; }
+      if (!validBackup(d)) { toast("這份備份檔內容不完整，沒有還原"); return; }
       if (!confirm("要用這份備份蓋掉這台裝置目前的設定和 " + Object.keys(log).length + " 筆紀錄嗎？")) return;
       localStorage.setItem(KEY, JSON.stringify(d.cfg)); localStorage.setItem(LOGKEY, JSON.stringify(d.log));
       location.reload();
     };
     fr.readAsText(f);
   });
+
+  // A restore overwrites everything: make sure the parts the page cannot run without are there
+  function validBackup(d) {
+    var c = d.cfg, t = /^\d\d:\d\d$/;
+    return !!c && c.salary > 0 && Array.isArray(c.shifts) && c.shifts.length > 0 &&
+      c.shifts.every(function (x) { return x && t.test(x.start) && t.test(x.end) && t.test(x.bs) && t.test(x.be); }) &&
+      !!d.log && typeof d.log === "object" && !Array.isArray(d.log);
+  }
 
   var toastTimer;
   function toast(msg) {
@@ -936,12 +928,21 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     $("perDay").textContent = fmt(monthInfo(new Date()).daily);
     $("otBase").textContent = fmt(cfg.salary / 240);
     $("rule").innerHTML = ruleText();
-    buyEls.forEach(function (b) { b.last = null; });
+    var since = cfg.lastBackup ? Math.round((parseDay(dateKey(Date.now())) - parseDay(cfg.lastBackup)) / 864e5) : -1;
+    $("bkLast").textContent = since < 0 ? "還沒有匯出過備份。" : "上次匯出備份：" + cfg.lastBackup + (since ? "（" + since + " 天前）" : "（今天）");
+    $("bkWarn").hidden = !(Object.keys(log).length && (since < 0 || since > 30));
     lastOt = null;
     tick();
   }
 
   /* ---------- Main loop ---------- */
+  // tick() runs 5 times a second: touch the page only where the text changed
+  function put(id, v, html) {
+    var el = $(id), k = (html ? "h" : "t") + v;
+    if (el._v === k) return;
+    el._v = k;
+    if (html) el.innerHTML = v; else el.textContent = v;
+  }
   function tick() {
     if (document.hidden) return;                     // nothing to see in the background: save the battery
     var now = new Date(), t = +now, sh = currentShift(now);
@@ -957,15 +958,15 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     }
     if (dateKey(t).slice(0, 7) !== logYm) renderLog(); // a new month: drop last month's records from the list
     var T = cfg.today.type;
-    $("clock").textContent = pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+    put("clock", pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()));
 
     var r = earnedAt(sh, t), total = r.base + r.extra;
     lastSh = sh;
 
     var a = earnedAt(sh, t, true), b = earnedAt(sh, t + 1000, true);
     var rate = (b.base + b.extra) - (a.base + a.extra);
-    $("perSec").textContent = rate.toFixed(3);
-    $("perHour").textContent = fmt(rate * 3600);
+    put("perSec", rate.toFixed(3));
+    put("perHour", fmt(rate * 3600));
 
     // Status
     var state, label;
@@ -984,16 +985,16 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Breakdown and the next overtime unit
     var extraName = { normal: "加班費", rest: "休息日加班費", holiday: "假日加發工資", duty: "值班津貼" }[T];
     var otNote = r.ot > 0 ? "（加班計 " + hours(r.ot) + "）" : "";
-    if (notYet) $("split").textContent = "到職後就開始跳表";
-    else if (T === "off") $("split").innerHTML = "今天放假，月薪照算：月薪 ÷ 30 = <b>" + fmt(cfg.salary / 30 * netFactor(monthInfo(now))) + "</b>／天" + (cfg.ins.net ? "（已扣勞健保）" : "");
-    else if (T === "normal") $("split").innerHTML = (cfg.ins.net ? "底薪（已扣勞健保）" : "底薪") + " <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote;
-    else $("split").innerHTML = "<span class=\"o\">" + extraName + " <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote + "　月薪另外照領";
+    if (notYet) put("split", "到職後就開始跳表");
+    else if (T === "off") put("split", "今天放假，月薪照算：月薪 ÷ 30 = <b>" + fmt(cfg.salary / 30 * netFactor(monthInfo(now))) + "</b>／天" + (cfg.ins.net ? "（已扣勞健保）" : ""), true);
+    else if (T === "normal") put("split", (cfg.ins.net ? "底薪（已扣勞健保）" : "底薪") + " <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote, true);
+    else put("split", "<span class=\"o\">" + extraName + " <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote + "　月薪另外照領", true);
 
     var raw = otRaw(sh, t), inOt = T !== "off" && T !== "duty" && t < sh.fe && raw > 0 && state !== "lunch";
     if (inOt) {
       var left = unit() - (raw % unit());
       var gain = earnedAt(sh, t + left).extra - r.extra;
-      $("pending").innerHTML = "再撐 <b>" + ms2(left) + "</b> 就多入帳 <b>NT$" + fmt(gain) + "</b>（未滿 " + cfg.otUnit + " 分鐘不計）";
+      put("pending", "再撐 <b>" + ms2(left) + "</b> 就多入帳 <b>NT$" + fmt(gain) + "</b>（未滿 " + cfg.otUnit + " 分鐘不計）", true);
     }
     $("pending").hidden = !inOt;
     if (lastOt !== null && r.ot > lastOt) toast("加班又滿 " + cfg.otUnit + " 分鐘，加班費入帳！");
@@ -1002,19 +1003,19 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     // Countdown
     if (notYet) {
       var sd = parseDay(cfg.startDate), left = startMs() - t;
-      $("cdLabel").textContent = "距離到職";
-      $("countdown").textContent = left >= 864e5 ? Math.floor(left / 864e5) + " 天 " + hms(left % 864e5) : hms(left);
-      $("pct").textContent = (sd.getMonth() + 1) + "/" + sd.getDate() + "（" + WEEK[sd.getDay()] + "）開始跳表";
+      put("cdLabel", "距離到職");
+      put("countdown", left >= 864e5 ? Math.floor(left / 864e5) + " 天 " + hms(left % 864e5) : hms(left));
+      put("pct", (sd.getMonth() + 1) + "/" + sd.getDate() + "（" + WEEK[sd.getDay()] + "）開始跳表");
     }
-    else if (T === "off") { $("cdLabel").textContent = "今天"; $("countdown").textContent = "放假"; $("pct").textContent = ""; }
-    else if (state === "before") { $("cdLabel").textContent = "距離上班"; $("countdown").textContent = hms(sh.s - t); $("pct").textContent = ""; }
-    else if (state === "ask") { $("cdLabel").textContent = "到下班時間了"; $("countdown").textContent = "下班了嗎？"; $("pct").textContent = ""; }
+    else if (T === "off") { put("cdLabel", "今天"); put("countdown", "放假"); put("pct", ""); }
+    else if (state === "before") { put("cdLabel", "距離上班"); put("countdown", hms(sh.s - t)); put("pct", ""); }
+    else if (state === "ask") { put("cdLabel", "到下班時間了"); put("countdown", "下班了嗎？"); put("pct", ""); }
     else if (state === "off") {
-      $("cdLabel").textContent = "今天辛苦了"; $("countdown").textContent = "下班囉";
-      $("pct").textContent = sh.punched || !sh.confirmed ? "" : "沒按下班，自動算到 " + hm(sh.cap);
+      put("cdLabel", "今天辛苦了"); put("countdown", "下班囉");
+      put("pct", sh.punched || !sh.confirmed ? "" : "沒按下班，自動算到 " + hm(sh.cap));
     }
-    else if (t >= sh.e) { $("cdLabel").textContent = "已加班"; $("countdown").textContent = hms(t - sh.e); $("pct").textContent = "目前計入 " + hours(r.ot); }
-    else { $("cdLabel").textContent = "距離下班"; $("countdown").textContent = hms(sh.e - t); $("pct").textContent = "已完成 " + ((t - sh.s) / (sh.e - sh.s) * 100).toFixed(1) + "%"; }
+    else if (t >= sh.e) { put("cdLabel", "已加班"); put("countdown", hms(t - sh.e)); put("pct", "目前計入 " + hours(r.ot)); }
+    else { put("cdLabel", "距離下班"); put("countdown", hms(sh.e - t)); put("pct", "已完成 " + ((t - sh.s) / (sh.e - sh.s) * 100).toFixed(1) + "%"); }
 
     // Bar: regular part blue, overtime part red
     var end = sh.punched ? Math.max(sh.fe, sh.e) : (sh.confirmed && t >= sh.e ? sh.cap : sh.e);
@@ -1026,10 +1027,10 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     $("otzone").hidden = end <= sh.e;
     $("otzone").style.left = (eFrac * 100) + "%";
     var def = cfg.shifts[cfg.today.shift] || cfg.shifts[0];
-    $("lStart").textContent = def.start;
-    if (sh.punched && sh.fe > sh.e) $("lEnd").innerHTML = def.end + " → <span class=\"o\">" + hm(sh.fe) + " 下班</span>";
-    else if (!sh.punched && sh.confirmed && t >= sh.e) $("lEnd").innerHTML = def.end + " → <span class=\"o\">最多 " + hm(sh.cap) + "</span>";
-    else $("lEnd").textContent = def.end;
+    put("lStart", def.start);
+    if (sh.punched && sh.fe > sh.e) put("lEnd", def.end + " → <span class=\"o\">" + hm(sh.fe) + " 下班</span>", true);
+    else if (!sh.punched && sh.confirmed && t >= sh.e) put("lEnd", def.end + " → <span class=\"o\">最多 " + hm(sh.cap) + "</span>", true);
+    else put("lEnd", def.end);
     var lunch = $("bar").querySelector(".lunch");
     if (!lunch) { lunch = document.createElement("div"); lunch.className = "lunch"; $("bar").insertBefore(lunch, $("fill")); }
     var lo = Math.max(sh.bs, sh.s), hi = Math.min(sh.be, end);
@@ -1051,13 +1052,13 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var btn = $("punchBtn"), canPunch = T !== "off" && !notYet && state !== "leave" && t >= sh.s && t < sh.fe;
     btn.hidden = !canPunch;
     $("askRow").hidden = state !== "ask";
-    $("askText").textContent = "已經過了表定下班時間 " + def.end + "，你還在加班嗎？";
+    put("askText", "已經過了表定下班時間 " + def.end + "，你還在加班嗎？");
     var armed = t < armedUntil;
     btn.dataset.armed = armed ? "true" : "false";
     btn.textContent = armed ? "還沒到 " + def.end + "，確定提早走？再按一次" : "我下班了";
-    if (sh.punched) $("punchInfo").innerHTML = "已打卡下班 <b>" + hm(sh.fe) + "</b>" + (r.ot > 0 ? "，加班計 <b>" + hours(r.ot) + "</b>" : "");
-    else if (canPunch && t >= sh.e) $("punchInfo").textContent = "加班結束時按一下";
-    else $("punchInfo").textContent = "";
+    if (sh.punched) put("punchInfo", "已打卡下班 <b>" + hm(sh.fe) + "</b>" + (r.ot > 0 ? "，加班計 <b>" + hours(r.ot) + "</b>" : ""), true);
+    else if (canPunch && t >= sh.e) put("punchInfo", "加班結束時按一下");
+    else put("punchInfo", "");
 
     // Today's record: extra pay and leave deduction
     var rec = dayRec(cfg.today, sh, r);
@@ -1070,14 +1071,43 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var mi = monthInfo(now), m = monthSums(now), cy = otCycle(now);
     var frac = Math.max(0, Math.min(1, (t - mi.from) / (mi.to - mi.from)));
     var mBase = mi.pay * frac, mIns = (mi.labor + mi.health) * frac, mW = mi.welfare * frac, mS = mi.self * frac;
-    $("mBase").textContent = "NT$" + fmt(mBase);
-    $("mExtraLabel").textContent = "加班／值班（" + md(cy.from) + "–" + md(cy.to) + "）";
-    $("mExtra").textContent = "+NT$" + fmt(m.extra);
-    $("mLeave").textContent = "−NT$" + fmt(m.deduct);
-    $("mIns").textContent = "−NT$" + fmt(mIns);
-    $("mWelfareRow").hidden = !(mi.welfare > 0); $("mWelfare").textContent = "−NT$" + fmt(mW);
-    $("mSelfRow").hidden = !(mi.self > 0); $("mSelf").textContent = "−NT$" + fmt(mS);
-    $("mNet").textContent = "NT$" + fmt(mBase + m.extra - m.deduct - mIns - mW - mS);
+    put("mBase", "NT$" + fmt(mBase));
+    put("mExtraLabel", "加班／值班（" + md(cy.from) + "–" + md(cy.to) + "）");
+    put("mExtra", "+NT$" + fmt(m.extra));
+    put("mLeave", "−NT$" + fmt(m.deduct));
+    put("mIns", "−NT$" + fmt(mIns));
+    $("mWelfareRow").hidden = !(mi.welfare > 0); put("mWelfare", "−NT$" + fmt(mW));
+    $("mSelfRow").hidden = !(mi.self > 0); put("mSelf", "−NT$" + fmt(mS));
+    var net = mBase + m.extra - m.deduct - mIns - mW - mS;
+    var full = mi.pay + m.extra - m.deduct - mi.labor - mi.health - mi.welfare - mi.self;
+    put("mNet", "NT$" + fmt(net));
+    put("mFull", "NT$" + fmt(full));
+    put("mOt", +(m.ot / H).toFixed(1) + " / 46 小時");
+    $("mOt").classList.toggle("o", m.ot > 46 * H);
+
+    // Saving goal: the month's take-home so far against what you want to put aside
+    var G = cfg.saveGoal || 0;
+    $("goalCard").hidden = !(G > 0 && mi.share > 0);
+    if (G > 0 && mi.share > 0) {
+      var gRate = (full - m.extra + m.deduct) / (mi.to - mi.from), hit = t + (G - net) / gRate, gd = G / mi.days;
+      put("gNum", "NT$" + fmt(Math.min(net, G)) + " / NT$" + fmt(G));
+      $("gBar").style.width = (Math.max(0, Math.min(1, net / G)) * 100) + "%";
+      put("gNote", net >= G ? "這個月要存的已經賺到了，之後賺的 NT$" + fmt(net - G) + " 都是可以花的。"
+        : gRate > 0 && hit < mi.to ? "照目前的速度，" + md(dateKey(hit)) + "（" + WEEK[new Date(hit).getDay()] + "）" + hm(hit) + " 左右賺夠這個月要存的，之後賺的都是可以花的。"
+        : "這個月預估實領 NT$" + fmt(full) + "，離目標還差 NT$" + fmt(G - full) + "。");
+      put("gDay", "今天這一份 NT$" + fmt(gd) + "：" + (total >= gd ? "已經賺到了。" : "還差 NT$" + fmt(gd - total) + "。"));
+    }
+
+    // The year so far (only worked out while its card is open)
+    if ($("yearBox").open) {
+      var ys = yearStats(now, mBase);
+      put("yPay", "NT$" + fmt(ys.pay + ys.extra - ys.deduct));
+      put("yExtra", "+NT$" + fmt(ys.extra));
+      put("yOt", hours(ys.ot) + "（" + ys.otDays + " 天）");
+      put("yMax", ys.maxKey ? md(ys.maxKey) + "　" + hours(ys.max) : "還沒有");
+      put("yLeave", ys.leave + " 天" + (ys.deduct ? "，扣薪 −NT$" + fmt(ys.deduct) : ""));
+      put("yPayLeft", ys.left + " 次");
+    }
     var pension = mi.pension;
     var sd = cfg.startDate ? parseDay(cfg.startDate) : null;
     var split = "平均分到這個月的 " + mi.days + " 天，放假也算，每天累積 NT$" + fmt(mi.pay / mi.days) + "（已過 " + Math.floor(frac * mi.days) + "/" + mi.days + " 天）。";
@@ -1090,18 +1120,10 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var pd = nextPayday(now), pdToday = dateKey(+pd) === dateKey(t);
     var left = Math.round((+pd - +new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
     $('payday').classList.toggle('today', pdToday);
-    $('pdLabel').textContent = pdToday ? '今天發薪日！' : '下次發薪（每月最後一個工作日）';
-    $('pdDate').textContent = (pd.getMonth() + 1) + '/' + pd.getDate() + '（' + '日一二三四五六'[pd.getDay()] + '）' + (pdToday ? '' : ' · 還有 ' + left + ' 天');
-    $("mNote").textContent = lead + "公司每月另外幫你提撥勞退 NT$" + fmt(pension) + " 到個人帳戶，不從薪水扣，這個月目前累積 NT$" + fmt(pension * frac) + "。以上還沒扣所得稅。";
+    put("pdLabel", pdToday ? '今天發薪日！' : '下次發薪（' + (cfg.payDay ? '每月 ' + cfg.payDay + ' 號，遇假日提前' : '每月最後一個工作日') + '）');
+    put("pdDate", (pd.getMonth() + 1) + '/' + pd.getDate() + '（' + '日一二三四五六'[pd.getDay()] + '）' + (pdToday ? '' : ' · 還有 ' + left + ' 天'));
+    put("mNote", lead + "公司每月另外幫你提撥勞退 NT$" + fmt(pension) + " 到個人帳戶，不從薪水扣，這個月目前累積 NT$" + fmt(pension * frac) + "。以上還沒扣所得稅。");
 
-    // Buys
-    buyEls.forEach(function (b) {
-      var n = Math.floor(total / b.it.price);
-      b.cnt.textContent = n;
-      b.bar.style.width = ((total % b.it.price) / b.it.price * 100) + "%";
-      if (b.last !== null && n > b.last && (state === "work" || state === "ot")) toast("又賺到一份" + b.it.name + "了！");
-      b.last = n;
-    });
   }
 
   // A day's log record (extra pay and leave deduction), or null when there is nothing to record
@@ -1121,19 +1143,36 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   function recDeduct(v) { return typeof v === "number" ? 0 : (v.deduct || 0); }
   function todayKey() { return dateKey(currentShift(new Date()).s); }
   function parseDay(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  // Payday = last working day of the month: skip weekends and Taiwan national holidays on weekdays
+  // Payday = day `cfg.payDay` of the month (0 = its last day), moved back over weekends and Taiwan national holidays on weekdays
   var PAY_HOLIDAYS = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-27',
     '2026-04-03', '2026-04-06', '2026-05-01', '2026-06-19', '2026-09-25', '2026-09-28', '2026-10-09', '2026-10-26', '2026-12-25',
-    '2027-01-01', '2027-03-01', '2027-04-05'];
-  function lastWorkday(y, m) {
-    var d = new Date(y, m + 1, 0);
+    '2027-01-01', '2027-02-04', '2027-02-05', '2027-02-08', '2027-02-09', '2027-02-10', '2027-03-01', '2027-04-05', '2027-04-06', '2027-04-30',
+    '2027-06-09', '2027-09-15', '2027-09-28', '2027-10-11', '2027-10-25', '2027-12-24', '2027-12-31'];
+  function payday(y, m) {
+    var d = cfg.payDay ? new Date(y, m, cfg.payDay) : new Date(y, m + 1, 0);
     while (d.getDay() === 0 || d.getDay() === 6 || PAY_HOLIDAYS.indexOf(dateKey(+d)) >= 0) d.setDate(d.getDate() - 1);
     return d;
   }
   function nextPayday(now) {
-    var d = lastWorkday(now.getFullYear(), now.getMonth());
-    if (dateKey(+d) < dateKey(+now)) d = lastWorkday(now.getFullYear(), now.getMonth() + 1);
-    return d;
+    for (var i = 0; ; i++) {
+      var d = payday(now.getFullYear(), now.getMonth() + i);
+      if (dateKey(+d) >= dateKey(+now)) return d;
+    }
+  }
+  // This year so far: salary at today's rate month by month (`cur` = this month's accrued part), extras and leave from the log
+  function yearStats(now, cur) {
+    var y = now.getFullYear(), s = { pay: cur, extra: 0, deduct: 0, ot: 0, otDays: 0, max: 0, maxKey: "", leave: 0, left: 0 };
+    for (var m = 0; m < now.getMonth(); m++) s.pay += monthInfo(new Date(y, m, 1)).pay;
+    for (m = now.getMonth(); m < 12; m++) if (dateKey(+payday(y, m)) >= dateKey(+now)) s.left++;
+    Object.keys(log).forEach(function (k) {
+      var v = log[k];
+      if (+k.slice(0, 4) !== y) return;
+      s.extra += recExtra(v); s.deduct += recDeduct(v);
+      if (typeof v !== "object") return;
+      if (v.ot > 0 && v.type !== "duty") { s.ot += v.ot; s.otDays++; if (v.ot > s.max) { s.max = v.ot; s.maxKey = k; } }
+      if (v.leave && v.leave.kind) s.leave++;
+    });
+    return s;
   }
   // This month's pay: first month prorated as 在職日數 ÷ 30 (labor insurance and pension too); health insurance is a full month.
   // It accrues evenly over the calendar days from `from` to `to` (月薪 ÷ 30 a day; 1/28–1/31 of it in other month lengths).
@@ -1158,11 +1197,14 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   }
   function md(k, plus) { var d = parseDay(k); if (plus) d.setDate(d.getDate() + plus); return (d.getMonth() + 1) + "/" + d.getDate(); }
   function monthSums(now) {
-    var ym = dateKey(+now).slice(0, 7), cy = otCycle(now), m = { extra: 0, deduct: 0, next: 0 };
+    var ym = dateKey(+now).slice(0, 7), cy = otCycle(now), m = { extra: 0, deduct: 0, next: 0, ot: 0 };
     Object.keys(log).forEach(function (k) {
       if (k >= cy.from && k <= cy.to) m.extra += recExtra(log[k]);
       else if (k > cy.to) m.next += recExtra(log[k]);
-      if (k.slice(0, 7) === ym) m.deduct += recDeduct(log[k]);
+      if (k.slice(0, 7) === ym) {
+        m.deduct += recDeduct(log[k]);
+        if (log[k].ot > 0 && log[k].type !== "duty") m.ot += log[k].ot;   // 延長工時, counted by calendar month (勞基法 §32)
+      }
     });
     return m;
   }
@@ -1405,6 +1447,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   renderToday();
   renderLog();
   refresh();
+  $("yearBox").addEventListener("toggle", tick);
   setInterval(tick, 200);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); });
   requestAnimationFrame(frame);
