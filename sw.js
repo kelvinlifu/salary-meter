@@ -1,5 +1,5 @@
 // Offline support: the app shell is cached on install; fonts are cached the first time they load.
-const CACHE = "salary-meter-v10";
+const CACHE = "salary-meter-v11";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
@@ -18,11 +18,16 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin === location.origin) {
-    // Network first, skipping the browser's HTTP cache, so updates show up right away; cache when offline
+    // Network first, skipping the browser's HTTP cache, so updates show up right away; the cache when offline,
+    // or when the network hasn't answered in 3 seconds (weak signal) - the fresh copy is still cached for the next open
+    const net = fetch(e.request, { cache: "no-store" })
+      .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res; });
+    const cached = () => caches.match(e.request).then((r) => r || caches.match("index.html"));
+    e.waitUntil(net.catch(() => {}));
     e.respondWith(
-      fetch(e.request, { cache: "no-store" })
-        .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return res; })
-        .catch(() => caches.match(e.request).then((r) => r || caches.match("index.html")))
+      Promise.race([net, new Promise((r) => setTimeout(r, 3000))])
+        .then((res) => res || cached().then((r) => r || net))
+        .catch(cached)
     );
   } else if (url.hostname.endsWith("googleapis.com") || url.hostname.endsWith("gstatic.com")) {
     e.respondWith(
