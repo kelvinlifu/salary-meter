@@ -73,9 +73,8 @@ body {
   padding-block: 28px 48px;
   display: flex; flex-direction: column; gap: 20px;
 }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
-.clock { font-family: var(--font-num); color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }   /* the app's name is on the home-screen icon; the meter comes first */
+.clock { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: .04em; margin-left: 8px; }
 
 /* The meter */
 .meter {
@@ -300,21 +299,18 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
 
 <div class="wrap">
-  <header>
-    <h1>薪水跳表機</h1>
-    <span class="clock" id="clock">--:--:--</span>
-  </header>
+  <h1 class="sr-only">薪水跳表機</h1>
 
   <section class="meter" aria-live="off">
     <div class="meter-top">
-      <span class="meter-label">今日已入帳</span>
+      <span class="meter-label">今日已入帳<span class="clock" id="clock">--:--:--</span></span>
       <span class="chip" id="status" data-s="before">上班前</span>
     </div>
     <div class="amount"><span class="cur">NT$</span><span class="odo" id="earned" role="img" aria-label="NT$0.00"></span></div>
     <p class="split" id="split"></p>
     <p class="pending" id="pending" hidden></p>
     <div class="rates">
-      <div><span>現在每秒</span><b id="perSec">0</b></div>
+      <div><span>現在每分鐘</span><b id="perMin">0</b></div>
       <div><span>現在時薪</span><b id="perHour">0</b></div>
       <div><span>日薪</span><b id="perDay">0</b></div>
       <div><span>加班基準時薪</span><b id="otBase">0</b></div>
@@ -986,7 +982,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
     var a = earnedAt(sh, t, true), b = earnedAt(sh, t + 1000, true);
     var rate = (b.base + b.extra) - (a.base + a.extra);
-    put("perSec", rate.toFixed(3));
+    put("perMin", (rate * 60).toFixed(1));
     put("perHour", fmt(rate * 3600));
 
     // Status
