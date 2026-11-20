@@ -36,6 +36,7 @@ img { max-width: 100%; }
   --meter-dim: #8aa0b4;
   --bill: #2f6fb0;       /* NT$1000 bill blue */
   --bill-soft: #dbe8f5;
+  --track: #dbe8f5;      /* empty part of the bars */
   --lunch: #c9a227;
   --ot: #d4553a;         /* overtime */
   --font-display: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
@@ -49,14 +50,14 @@ img { max-width: 100%; }
   :root:not([data-theme="light"]) {
     --bg: #0d141b; --panel: #151f29; --ink: #e6ecf2; --muted: #93a3b3; --line: #26333f;
     --meter: #060b10; --meter-ink: #ffd166; --meter-dim: #6f8597;
-    --bill: #6fa8e0; --bill-soft: #1c3247; --lunch: #d9b23c; --ot: #ff8a6b;
+    --bill: #6fa8e0; --bill-soft: #1c3247; --track: #2a4866; --lunch: #d9b23c; --ot: #ff8a6b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d141b; --panel: #151f29; --ink: #e6ecf2; --muted: #93a3b3; --line: #26333f;
   --meter: #060b10; --meter-ink: #ffd166; --meter-dim: #6f8597;
-  --bill: #6fa8e0; --bill-soft: #1c3247; --lunch: #d9b23c; --ot: #ff8a6b;
+  --bill: #6fa8e0; --bill-soft: #1c3247; --track: #2a4866; --lunch: #d9b23c; --ot: #ff8a6b;
   color-scheme: dark;
 }
 
@@ -150,7 +151,7 @@ h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; marg
 /* Cards */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .card h2 { font-size: .8rem; letter-spacing: .14em; color: var(--muted); margin: 0; font-weight: 700; }
-.bar { position: relative; height: 14px; background: var(--bill-soft); border-radius: 7px; overflow: hidden; }
+.bar { position: relative; height: 14px; background: var(--track); border-radius: 7px; overflow: hidden; }
 .bar .fill, .bar .fillOt { position: absolute; top: 0; bottom: 0; width: 0; transition: width .4s linear; }
 .bar .fill { left: 0; background: var(--bill); }
 .bar .fillOt { background: var(--ot); }
@@ -178,7 +179,7 @@ h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; marg
 
 /* Buys */
 .goal-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 1.2rem; }
-.goal-bar { height: 10px; background: var(--bill-soft); border-radius: 5px; overflow: hidden; margin: 10px 0; }
+.goal-bar { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; margin: 10px 0; }
 .goal-bar i { display: block; height: 100%; width: 0; background: var(--bill); }
 .goal-bar + .hint + .hint { margin-top: 6px; }
 #yearBox .ledger { margin-top: 10px; }
