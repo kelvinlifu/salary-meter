@@ -241,7 +241,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   padding: 10px 22px; border-radius: 999px; border: none;
   background: var(--ink); color: var(--panel);
 }
-.punch-btn[data-armed="true"] { background: var(--ot); color: #fff; }
+.punch-btn[data-early="true"] { background: none; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+.punch-btn[data-armed="true"] { background: var(--ot); border-color: var(--ot); color: #fff; font-weight: 700; }
 .punch-info { font-size: .9rem; color: var(--muted); }
 .punch-info b { color: var(--ink); font-family: var(--font-num); font-weight: 500; }
 .linkbtn { font: inherit; font-size: .85rem; background: none; border: none; color: var(--bill); cursor: pointer; padding: 0; text-decoration: underline; }
@@ -280,6 +281,15 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 .ledger .total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; }
 .ledger .total dt { color: var(--ink); font-weight: 700; }
 .ledger .total dd { font-weight: 600; font-size: 1.2rem; }
+.m-hero { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.m-hero span, .m-ot span { color: var(--muted); font-size: .9rem; }
+.m-hero small, .m-ot small { font-size: .78rem; }
+.m-hero b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 1.7rem; line-height: 1.2; }
+.m-ot { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.m-ot b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 500; }
+.m-ot b.o { color: var(--ot); }
+.goal-bar.m-otbar { height: 6px; margin: -6px 0 0; }
+.goal-bar i.o { background: var(--ot); }
 .payday { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 8px 0 6px; padding: 10px 12px; border-radius: 10px; background: var(--bill-soft); }
 .payday span { color: var(--muted); font-size: .9rem; }
 .payday b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--bill); }
@@ -331,6 +341,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   <section class="card">
     <h2>今天是</h2>
     <div class="seg" role="radiogroup" aria-label="今天的出勤類型" id="types"></div>
+    <details class="more" id="adjBox"><summary id="adjSum">調整今天</summary>
     <div class="form">
       <label>班別<select id="shiftSel"></select></label>
       <label>實際下班時間（按「我下班了」會自動填）<span class="inline"><input type="time" id="punchTime"><button type="button" id="punchClear">取消</button></span></label>
@@ -339,6 +350,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <label id="leaveTimeWrap" hidden>請假時段<span class="inline"><input type="time" id="leaveFrom"><span class="dash">–</span><input type="time" id="leaveTo"></span></label>
       <p class="hint full" id="leaveNote" hidden></p>
     </div>
+    </details>
     <details class="more"><summary>這一天怎麼算</summary>
       <p class="rule" id="rule"></p>
       <p class="hint">過了表定下班時間會先問你還在不在加班。按了「還在加班」卻忘了按下班，最多算到表定下班後 4 小時。換日後會自動依上班日或輪班週期帶入當天的班。</p>
@@ -347,7 +359,11 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
 
   <section class="card">
     <h2>本月薪水</h2>
+    <div class="m-hero"><span>預估整月實領<small>（加班算到目前）</small></span><b id="mFull">NT$0</b></div>
     <div class='payday' id='payday'><span id='pdLabel'>下次發薪</span><b id='pdDate'>--</b></div>
+    <div class="m-ot"><span>本月加班<small>（上限 46 小時）</small></span><b id="mOt">0 / 46 小時</b></div>
+    <div class="goal-bar m-otbar"><i id="mOtBar"></i></div>
+    <details class="more"><summary id="mSum">明細</summary>
     <dl class="ledger">
       <div><dt>月薪（每天累積）</dt><dd id="mBase">NT$0</dd></div>
       <div><dt id="mExtraLabel">加班／值班</dt><dd class="o" id="mExtra">+NT$0</dd></div>
@@ -356,10 +372,9 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       <div id="mWelfareRow"><dt>職工福利金</dt><dd id="mWelfare">−NT$0</dd></div>
       <div id="mSelfRow"><dt>勞退自提</dt><dd id="mSelf">−NT$0</dd></div>
       <div class="total"><dt>目前實領累積</dt><dd id="mNet">NT$0</dd></div>
-      <div><dt>預估整月實領（加班算到目前）</dt><dd id="mFull">NT$0</dd></div>
-      <div><dt>本月加班（上限 46 小時）</dt><dd id="mOt">0 / 46 小時</dd></div>
     </dl>
-    <details class="more"><summary>這些數字怎麼算的</summary><p class="hint" id="mNote"></p></details>
+    <p class="hint" id="mNote"></p>
+    </details>
   </section>
 
   <section class="card" id="goalCard" hidden>
@@ -613,7 +628,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       lab.appendChild(document.createTextNode(d[1])); lab.appendChild(inp);
       inp.addEventListener("input", function () {
         if (!inp.value) return;
-        s[d[0]] = inp.value; save(); buildShiftSelect(); refresh();
+        s[d[0]] = inp.value; save(); buildShiftSelect(); renderToday(); refresh();
       });
       row.appendChild(lab);
     });
@@ -624,7 +639,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   var typeBtns = TYPES.map(function (t) {
     var b = document.createElement("button");
     b.type = "button"; b.setAttribute("role", "radio"); b.textContent = t.label;
-    b.addEventListener("click", function () { setToday({ type: t.id }); });
+    b.addEventListener("click", function () { setToday({ type: t.id }); if (t.id === "duty") $("adjBox").open = true; });
     $("types").appendChild(b);
     return { b: b, id: t.id };
   });
@@ -758,6 +773,11 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     $("leaveTimeWrap").hidden = T.type !== "normal" || !lv.kind;
     if (document.activeElement !== $("leaveFrom")) $("leaveFrom").value = lv.from || "";
     if (document.activeElement !== $("leaveTo")) $("leaveTo").value = lv.to || "";
+    var sum = [$("shiftSel").selectedOptions[0] ? $("shiftSel").selectedOptions[0].textContent : ""];
+    if (T.punch) sum.push(hm(T.punch) + " 下班");
+    if (T.type === "normal" && lv.kind) sum.push(LEAVES[lv.kind].label + " " + lv.from + "–" + lv.to);
+    if (T.type === "duty") sum.push("值班津貼 NT$" + fmt(T.dutyPay || 0));
+    $("adjSum").textContent = sum.join(" · ") + "　調整";
   }
 
   /* ---------- Time math ---------- */
@@ -987,6 +1007,11 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var otNote = r.ot > 0 ? "（加班計 " + hours(r.ot) + "）" : "";
     if (notYet) put("split", "到職後就開始跳表");
     else if (T === "off") put("split", "今天放假，月薪照算：月薪 ÷ 30 = <b>" + fmt(cfg.salary / 30 * netFactor(monthInfo(now))) + "</b>／天" + (cfg.ins.net ? "（已扣勞健保）" : ""), true);
+    else if (T === "normal" && r.extra === 0) {   // no overtime yet: what the rest of the shift still brings, not the big number again
+      var rest = earnedAt(sh, sh.e).base - r.base;
+      put("split", rest >= 0.5 ? "到 " + (cfg.shifts[cfg.today.shift] || cfg.shifts[0]).end + " 還會再入帳 <b>" + fmt(rest) + "</b>" + (cfg.ins.net ? "（已扣勞健保）" : "")
+        : "今天的份都入帳了" + (cfg.ins.net ? "（已扣勞健保）" : ""), true);
+    }
     else if (T === "normal") put("split", (cfg.ins.net ? "底薪（已扣勞健保）" : "底薪") + " <b>" + fmt(r.base) + "</b>　＋　<span class=\"o\">加班費 <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote, true);
     else put("split", "<span class=\"o\">" + extraName + " <b class=\"o\">" + fmt(r.extra) + "</b></span>" + otNote + "　月薪另外照領", true);
 
@@ -1055,6 +1080,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     put("askText", "已經過了表定下班時間 " + def.end + "，你還在加班嗎？");
     var armed = t < armedUntil;
     btn.dataset.armed = armed ? "true" : "false";
+    btn.dataset.early = t < sh.e ? "true" : "false";   // before the scheduled end it's an exception, so it stays low-key
     btn.textContent = armed ? "還沒到 " + def.end + "，確定提早走？再按一次" : "我下班了";
     if (sh.punched) put("punchInfo", "已打卡下班 <b>" + hm(sh.fe) + "</b>" + (r.ot > 0 ? "，加班計 <b>" + hours(r.ot) + "</b>" : ""), true);
     else if (canPunch && t >= sh.e) put("punchInfo", "加班結束時按一下");
@@ -1081,9 +1107,12 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var net = mBase + m.extra - m.deduct - mIns - mW - mS;
     var full = mi.pay + m.extra - m.deduct - mi.labor - mi.health - mi.welfare - mi.self;
     put("mNet", "NT$" + fmt(net));
+    put("mSum", "明細：目前實領累積 NT$" + fmt(net));
     put("mFull", "NT$" + fmt(full));
     put("mOt", +(m.ot / H).toFixed(1) + " / 46 小時");
     $("mOt").classList.toggle("o", m.ot > 46 * H);
+    $("mOtBar").style.width = (Math.min(1, m.ot / (46 * H)) * 100) + "%";
+    $("mOtBar").classList.toggle("o", m.ot > 40 * H);   // red from 40 hours, before the cap is reached
 
     // Saving goal: the month's take-home so far against what you want to put aside
     var G = cfg.saveGoal || 0;
@@ -1402,7 +1431,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
   }
 
   /* ---------- Odometer ---------- */
-  var odo = $("earned"), cells = [], shown = 0, drawn = null, lastSh = null, lastFrame = 0;
+  var odo = $("earned"), cells = [], shown = 0, drawn = null, lastSh = null, lastFrame = 0, lastActual = null;
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   var STRIP = "01234567890".split("").map(function (d) { return "<span>" + d + "</span>"; }).join("");
   function buildOdo(intDigits) {
@@ -1434,6 +1463,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var dt = lastFrame ? ts - lastFrame : 16; lastFrame = ts;
     var actual = 0;
     if (lastSh) { var r = earnedAt(lastSh, Date.now()); actual = r.base + r.extra; }
+    var still = actual === lastActual; lastActual = actual;
+    if (still) actual = Math.round(actual * 100) / 100;   // stopped (lunch, after work): settle the cent drum on a whole digit, not between two
     var gap = actual - shown;
     // Big jumps (opening the app, overtime landing) roll up; normal ticking follows exactly
     if (reduce || Math.abs(gap) < 0.5) shown = actual;
