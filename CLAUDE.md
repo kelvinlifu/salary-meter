@@ -1,6 +1,6 @@
 # salary-meter
 
-薪水跳表機: a taxi-meter style page that shows how much of today's pay has been earned, second by second, with overtime, days off, leave, shifts and labor/health insurance. A static PWA, no build and no npm: `index.html` (all HTML, CSS and JS), `sw.js` (offline), `manifest.webmanifest`, `icons/`. GitHub Pages publishes `main` to https://kelvinlifu.github.io/salary-meter/. Not one of the seven personal apps (no hub, no SQLite, no PIN): settings live in the browser's `localStorage` only.
+薪水跳表機: a taxi-meter style page that shows how much of today's pay has been earned, second by second, with overtime, days off, leave, shifts and labor/health insurance. A static PWA, no build and no npm for the page itself (`package.json` is only for the tests): `index.html` (all HTML, CSS and JS), `sw.js` (offline), `manifest.webmanifest`, `icons/`. GitHub Pages publishes `main` to https://kelvinlifu.github.io/salary-meter/. Not one of the seven personal apps (no hub, no SQLite, no PIN): settings live in the browser's `localStorage` only.
 
 ## Working with the user
 
@@ -17,14 +17,14 @@
 
 ## Testing
 
-There is no test suite. Serve the folder and drive it with Playwright (pre-installed in cloud sessions), using its fake clock to pick the moment:
+`test/meter.test.mjs` (node:test + Playwright, the only npm package, a devDependency - the page itself still has no build and no npm) serves the folder on a free port, opens it in Chromium in Asia/Taipei with service workers blocked, and checks a workday, lunch, weekday / rest-day / holiday pay, a night shift past midnight, a day off, the start date, leave, the new-day reset and the payday:
 
 ```bash
-python3 -m http.server 8765        # from the repo root, in the background
-TZ=Asia/Taipei node check.js       # a throwaway script in the scratchpad, not in the repo
+npm install --ignore-scripts   # once; Playwright's Chromium must be installed (npx playwright install chromium)
+npm test
 ```
 
-In the script: `page.clock.install({ time: new Date('2026-11-06T15:00:00+08:00') })` before `goto`, `page.clock.runFor(ms)` to let the 200 ms tick run, `page.clock.setSystemTime(...)` to jump (past midnight, into a new month), `addInitScript` to seed `localStorage`. Read `#status`, `#earned`'s `aria-label`, `#split`, `#logList`, the month card (`#mBase`, `#mExtra`...). Check the edges a change can touch: night shifts crossing midnight, the new-day reset, month change, days off, the start date. Cloud sessions can't reach kelvinlifu.github.io: confirm a deploy from the `pages build and deployment` workflow run instead.
+Each test seeds `localStorage` with `addInitScript`, installs the fake clock before `goto` (`page.clock.install`), lets the 200 ms tick run (`runFor`), jumps with `setSystemTime` (past midnight, into a new day), and reads `#status`, `#split` (not `#earned`, which rolls toward its figure), `#pdDate` and the log in `localStorage`. Add a test for a change's edges (night shifts, the new-day reset, month change, days off, the start date); reproduce a bug as a failing test first. Cloud sessions can't reach kelvinlifu.github.io: confirm a deploy from the `pages build and deployment` workflow run instead.
 
 ## Design
 
