@@ -877,7 +877,8 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
       r.extra = tiered(ot, RULES.rest, hourly);
     } else if (T === "holiday") {
       var first = Math.min(sh.regMs, 8 * H);         // one extra day's wage for up to 8 hours
-      r.extra = first > 0 ? (cfg.salary / 30) * Math.min(w, first) / first : 0;
+      // The meter accrues it over the first 8 hours; once punched out it is the whole day, however short (勞基法 §39)
+      r.extra = first > 0 ? (cfg.salary / 30) * (sh.punched && w > 0 ? 1 : Math.min(w, first) / first) : 0;
       r.extra += tiered(ot, RULES.holiday, hourly);
     } else if (T === "duty") {
       r.extra = sh.regMs > 0 ? td.dutyPay * Math.min(w, sh.regMs) / sh.regMs : 0;
@@ -893,7 +894,7 @@ summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-v
     var u = "加班以 <b>" + cfg.otUnit + " 分鐘</b>為單位，未滿不計。";
     if (T === "normal") return "平日加班：過了表定下班時間就開始算，前 2 小時 <b>×1.34</b>（NT$" + fmt(hourly * 4 / 3) + "/時），第 3–4 小時 <b>×1.67</b>（NT$" + fmt(hourly * 5 / 3) + "/時）。" + u + hb;
     if (T === "rest") return "休息日出勤：月薪照領，這天賺的全部是額外收入。前 2 小時 <b>×1.34</b>，第 3–8 小時 <b>×1.67</b>，第 9–12 小時 <b>×2.67</b>。" + u + hb;
-    if (T === "holiday") return "國定假日或例假日出勤：8 小時內<b>加發一日工資</b>（月薪 ÷ 30 = NT$" + fmt(cfg.salary / 30) + "），跳表會在表定時間內平均累積；超過 8 小時再依 ×1.34、×1.67 計算。" + u + "例假日出勤還應給補假。";
+    if (T === "holiday") return "國定假日或例假日出勤：8 小時內<b>加發一日工資</b>（月薪 ÷ 30 = NT$" + fmt(cfg.salary / 30) + "），跳表會在表定時間內平均累積，提早下班也算一整天；超過 8 小時再依 ×1.34、×1.67 計算。" + u + "例假日出勤還應給補假。";
     if (T === "duty") return "值班不一定算工作時間，多半是領公司訂的<b>值班津貼</b>。上面填這一班的津貼，跳表會在表定時間內平均累積。如果值班其實是在做正常工作，請改選休息日或國定假日。";
     var def = cfg.shifts[cfg.today.shift] || cfg.shifts[0];
     return "今天放假，月薪照算：跳表在上班時段 " + def.start + "–" + def.end + " 內把<b>月薪 ÷ 30</b> 跳完，休息時間和下班後不跳，跟上班日一樣。「本月薪水」也每天累積，放假一樣會增加。好好休息。";
